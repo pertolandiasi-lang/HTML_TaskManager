@@ -150,6 +150,8 @@
     .tc-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .tc-status-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); }
     .tc-status-sel { width: 152px; padding: 6px 30px 6px 10px; font-size: 12px; }
+    .btn-delete { background: none; border: 1px solid var(--border); border-radius: 7px; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 5px 10px; transition: border-color .15s, color .15s; }
+    .btn-delete:hover { border-color: rgba(255,80,80,.5); color: #ff6060; }
 
     /* ── UPLOAD ──────────────────────────────────────────────── */
     .upload-drop { border: 1px dashed var(--border); border-radius: 9px; padding: 16px; text-align: center; cursor: pointer; position: relative; transition: all .15s; }
@@ -337,13 +339,17 @@
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
   const COLOR_MAP = { 'Da fare': { assign:'10', deadline:'11' }, 'In lavoro': { assign:'10', deadline:'5' }, 'Completato': { assign:'8', deadline:'10' } };
 
-  let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null;
+  let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
 
   window.onload = function() {
     var t = setInterval(function() {
       if (window.google && google.accounts) {
         clearInterval(t);
         tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleTokenResponse });
+        if (localStorage.getItem('tf_logged_in')) {
+          silentAttempt = true;
+          tokenClient.requestAccessToken({ prompt: '', login_hint: localStorage.getItem('tf_hint') || '' });
+        }
       }
     }, 100);
   };
@@ -356,13 +362,26 @@
   function signOut() {
     if (accessToken) google.accounts.oauth2.revoke(accessToken);
     accessToken = null;
+    localStorage.removeItem('tf_logged_in');
+    localStorage.removeItem('tf_hint');
     document.getElementById('app').classList.add('hidden');
     document.getElementById('signin-screen').classList.remove('hidden');
     document.getElementById('signin-btn').disabled = false;
   }
   async function handleTokenResponse(resp) {
+    if (resp.error) {
+      if (silentAttempt) {
+        silentAttempt = false;
+        localStorage.removeItem('tf_logged_in');
+        localStorage.removeItem('tf_hint');
+        return;
+      }
+      showToast('Errore: ' + resp.error, 'error');
+      document.getElementById('signin-btn').disabled = false;
+      return;
+    }
+    silentAttempt = false;
     document.getElementById('signin-btn').disabled = false;
-    if (resp.error) { showToast('Errore: ' + resp.error, 'error'); return; }
     accessToken = resp.access_token;
     try { await loadUserAndInit(); } catch(e) { showToast('Errore: ' + e.message, 'error'); }
   }
@@ -401,6 +420,8 @@
     } else {
       document.getElementById('view-unauth').classList.remove('hidden');
     }
+    localStorage.setItem('tf_logged_in', '1');
+    localStorage.setItem('tf_hint', userEmail);
     document.getElementById('signin-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
   }
@@ -442,6 +463,15 @@
     for (var i=1;i<rows.length;i++) {
       var r=rows[i]; if (!r[2]) continue; if (r[2].trim().toLowerCase()!==email.toLowerCase()) continue;
       tasks.push({ id:r[0],company:r[1],assignee:r[2],assignDate:r[3]||'',deadline:r[4]||'',brief:r[5]||'',driveUrl:r[6]||'',docUrl:r[7]||'',status:r[8]||'Da fare',assignEventId:r[9]||'',deadlineEventId:r[10]||'' });
+    }
+    tasks.sort(function(a,b){ return a.deadline<b.deadline?-1:1; });
+    return tasks;
+  }
+  async function getAllTasks() {
+    var rows=await sheetsGet('Tasks'), tasks=[];
+    for (var i=1;i<rows.length;i++) {
+      var r=rows[i]; if (!r[0]) continue;
+      tasks.push({ id:r[0],company:r[1],assignee:r[2]||'',assignDate:r[3]||'',deadline:r[4]||'',brief:r[5]||'',driveUrl:r[6]||'',docUrl:r[7]||'',status:r[8]||'Da fare',assignEventId:r[9]||'',deadlineEventId:r[10]||'' });
     }
     tasks.sort(function(a,b){ return a.deadline<b.deadline?-1:1; });
     return tasks;
@@ -570,7 +600,7 @@
   async function loadMyTasks() {
     var c=document.getElementById('task-sections'); c.innerHTML='<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task...</div></div>';
     try {
-      var tasks=await getMyTasks(userEmail);
+      var tasks=userRole==='manager' ? await getAllTasks() : await getMyTasks(userEmail);
       if (!tasks.length) { c.innerHTML='<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task assegnato</div><div class="es-sub">Quando il responsabile creerà un nuovo task, comparirà qui.</div></div>'; return; }
       var s={ total:tasks.length,todo:0,progress:0,done:0 }; tasks.forEach(function(t){ var k=SK[t.status]||'todo'; s[k]++; }); renderStats(s);
       c.innerHTML=''; var grid=document.createElement('div'); grid.className='tasks-grid'; tasks.forEach(function(t){ grid.appendChild(buildTaskCard(t)); }); c.appendChild(grid);
@@ -586,7 +616,8 @@
     if (task.driveUrl) links+='<a href="'+esc(task.driveUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Drive</a>';
     if (task.docUrl)   links+='<a href="'+esc(task.docUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Brief</a>';
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div><p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select></div>';
+    var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatario: '+esc(task.assignee)+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
@@ -594,6 +625,22 @@
     var card=document.getElementById('card-'+taskId), sel=card.querySelector('select'); sel.disabled=true;
     try { await updateTaskStatus(taskId,newStatus); showToast('✓ Stato aggiornato · Calendar sincronizzato','success'); setTimeout(loadMyTasks,400); }
     catch(e) { sel.disabled=false; showToast('Errore: '+e.message,'error'); }
+  }
+
+  async function deleteTask(taskId) {
+    if (!confirm('Eliminare questo task? Verranno rimossi anche gli eventi su Calendar e la riga dal foglio.')) return;
+    var rows=await sheetsGet('Tasks'), rowIndex=-1, assignId='', deadlineId='';
+    for (var i=1;i<rows.length;i++) { if (rows[i][0]&&rows[i][0].toString()===taskId.toString()) { rowIndex=i+1; assignId=rows[i][9]||''; deadlineId=rows[i][10]||''; break; } }
+    if (rowIndex===-1) { showToast('Task non trovato','error'); return; }
+    var btn=document.getElementById('del-'+taskId); if (btn) { btn.disabled=true; btn.textContent='…'; }
+    if (assignId)   try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+assignId,   { method:'DELETE' }); } catch(e){}
+    if (deadlineId) try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+deadlineId, { method:'DELETE' }); } catch(e){}
+    var meta=await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'?fields=sheets.properties');
+    var sh=meta.sheets.find(function(s){ return s.properties.title==='Tasks'; });
+    var sheetId=sh?sh.properties.sheetId:0;
+    await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+':batchUpdate', { method:'POST', body:{ requests:[{ deleteDimension:{ range:{ sheetId:sheetId, dimension:'ROWS', startIndex:rowIndex-1, endIndex:rowIndex } } }] } });
+    showToast('✓ Task eliminato','success');
+    setTimeout(loadMyTasks,400);
   }
 </script>
 </body>
