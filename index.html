@@ -228,7 +228,8 @@
       z-index: 9999;
       max-width: 360px;
       text-align: center;
-      line-height: 1.4;
+      line-height: 1.5;
+      white-space: pre-line;
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
       animation: toastPop .28s cubic-bezier(.16,1,.3,1);
     }
@@ -770,6 +771,10 @@
     document.getElementById('splash').classList.add('hidden');
     document.getElementById('signin-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
+
+    if (userRole === 'manager' || userRole === 'employee') {
+      gasCall('getTasks').then(function(r) { checkNewTasks(r.tasks || []); }).catch(function(){});
+    }
   }
 
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
@@ -1035,7 +1040,25 @@
   function days(s) { if (!s) return null; var d=new Date(s+'T00:00:00'),n=new Date(); n.setHours(0,0,0,0); return Math.round((d-n)/86400000); }
 
   var _tt;
-  function showToast(msg, type) { var t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(type||'success'); clearTimeout(_tt); _tt=setTimeout(function(){ t.className='toast hidden'; },4000); }
+  function showToast(msg, type, duration) { var t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(type||'success'); clearTimeout(_tt); _tt=setTimeout(function(){ t.className='toast hidden'; }, duration||4000); }
+
+  var _newTasksChecked = false;
+  function checkNewTasks(tasks) {
+    if (_newTasksChecked || !userEmail) return;
+    _newTasksChecked = true;
+    var key = 'tf_last_seen_' + userEmail;
+    var lastSeen = parseInt(localStorage.getItem(key) || '0');
+    localStorage.setItem(key, Date.now().toString());
+    if (!lastSeen) return; // first-ever login: skip greeting
+    var mine = tasks.filter(function(t) {
+      return t.assignee && t.assignee.toLowerCase() === userEmail.toLowerCase() && parseInt(t.id) > lastSeen;
+    });
+    if (!mine.length) return;
+    var firstName = (userName || userEmail.split('@')[0]).split(' ')[0];
+    var word = mine.length === 1 ? 'nuovo task assegnato' : 'nuovi task assegnati';
+    var list = mine.map(function(t){ return '• ' + t.company; }).join('\n');
+    showToast('Ciao ' + firstName + ', hai ' + mine.length + ' ' + word + ':\n' + list, 'success', 9000);
+  }
 
   function switchView(v) {
     document.getElementById('view-manager').classList.toggle('hidden', v!=='manager');
