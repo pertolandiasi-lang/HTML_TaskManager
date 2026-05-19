@@ -226,6 +226,27 @@
     .splash-name { font-size: 20px; font-weight: 700; color: var(--text); }
     .splash-spin { width: 22px; height: 22px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin-top: 4px; }
 
+    /* ── UPDATE BANNER ──────────────────────────────────────── */
+    #update-banner {
+      position: fixed;
+      left: 12px; right: 12px;
+      bottom: calc(env(safe-area-inset-bottom) + 12px);
+      background: var(--primary); color: var(--primary-fg);
+      border-radius: 14px; padding: 12px 14px 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      z-index: 1100; font-size: 14px; font-weight: 600;
+      box-shadow: 0 10px 32px rgba(0,0,0,.4);
+      animation: ubSlideUp .35s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes ubSlideUp { from { transform: translateY(120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .ub-msg { flex: 1; }
+    .ub-btn {
+      background: var(--primary-fg); color: var(--primary);
+      border: none; padding: 8px 14px; border-radius: 9px;
+      font-weight: 700; cursor: pointer; font-family: inherit; font-size: 13px;
+    }
+    .ub-btn:disabled { opacity: .6; }
+
     /* ── PULL-TO-REFRESH ────────────────────────────────────── */
     #ptr-pill {
       position: fixed;
@@ -326,6 +347,10 @@
 <body>
 
 <div id="toast" class="toast hidden"></div>
+<div id="update-banner" class="hidden">
+  <span class="ub-msg">🔄 Nuova versione disponibile</span>
+  <button class="ub-btn" onclick="applyUpdate()">Aggiorna</button>
+</div>
 <div id="ptr-pill"></div>
 <div id="splash" class="hidden">
   <div class="splash-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -533,6 +558,49 @@
       if (_reloading) return;
       _reloading = true; location.reload();
     });
+  }
+
+  // ── UPDATE DETECTOR (works independently of service worker) ───────────
+  var _versionSig = null, _updateShown = false;
+  async function checkForUpdate() {
+    if (_updateShown) return;
+    try {
+      var url = location.pathname + '?_v=' + Date.now();
+      var resp = await fetch(url, { cache: 'no-store', method: 'HEAD' });
+      if (!resp.ok) return;
+      var sig = resp.headers.get('ETag') || resp.headers.get('Last-Modified') || resp.headers.get('content-length');
+      if (!sig) return;
+      if (_versionSig === null) { _versionSig = sig; return; }
+      if (sig !== _versionSig) {
+        _updateShown = true;
+        document.getElementById('update-banner').classList.remove('hidden');
+      }
+    } catch(e) {}
+  }
+  checkForUpdate();
+  setInterval(checkForUpdate, 60000);
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  });
+
+  async function applyUpdate() {
+    var banner = document.getElementById('update-banner');
+    banner.querySelector('.ub-btn').disabled = true;
+    banner.querySelector('.ub-msg').textContent = 'Aggiornamento…';
+    try {
+      if ('serviceWorker' in navigator) {
+        var regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(function(r){ return r.unregister(); }));
+      }
+      if ('caches' in window) {
+        var keys = await caches.keys();
+        await Promise.all(keys.map(function(k){ return caches.delete(k); }));
+      }
+    } catch(e) {}
+    setTimeout(function() {
+      var u = location.pathname + '?_t=' + Date.now() + (location.hash || '');
+      location.replace(u);
+    }, 200);
   }
 
   const CLIENT_ID = '848444804320-ndpeev8k3bs0o71h7orac09liohr7kmc.apps.googleusercontent.com';
