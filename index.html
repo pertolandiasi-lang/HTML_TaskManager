@@ -336,8 +336,8 @@
 <script>
   const CLIENT_ID = '848444804320-ndpeev8k3bs0o71h7orac09liohr7kmc.apps.googleusercontent.com';
   const SHEET_ID  = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
+  const GAS_URL   = 'REPLACE_WITH_DEPLOYMENT_URL';
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
-  const COLOR_MAP = { 'Da fare': { assign:'10', deadline:'11' }, 'In lavoro': { assign:'10', deadline:'5' }, 'Completato': { assign:'8', deadline:'10' } };
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
 
@@ -400,7 +400,9 @@
   async function loadUserAndInit() {
     var info = await api('https://www.googleapis.com/oauth2/v2/userinfo');
     userEmail = info.email; userName = info.name || info.email.split('@')[0];
-    userRole  = await getUserRole(userEmail);
+    var roleResult = await gasCall('getRole');
+    userRole = roleResult.role;
+    if (roleResult.name && roleResult.name !== userEmail) userName = roleResult.name;
     document.getElementById('hdr-avatar').textContent = (userName[0]||'?').toUpperCase();
     document.getElementById('emp-name').textContent   = userName;
     var roleEl = document.getElementById('hdr-role');
@@ -426,23 +428,24 @@
     document.getElementById('app').classList.remove('hidden');
   }
 
-  async function sheetsGet(range) { var d = await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)); return d.values||[]; }
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
-  async function sheetsUpdate(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=RAW', { method:'PUT', body:{ values:values } }); }
 
-  async function getUserRole(email) {
-    var rows = await sheetsGet('Team');
-    for (var i=1;i<rows.length;i++) { if (rows[i][1] && rows[i][1].trim().toLowerCase()===email.toLowerCase()) return rows[i][2].trim().toLowerCase(); }
-    return 'unauthorized';
+  async function gasCall(action, extra) {
+    extra = extra || {};
+    extra.action = action; extra.token = accessToken;
+    var res = await fetch(GAS_URL, { method:'POST', body: JSON.stringify(extra) });
+    var data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
   }
+
   async function loadTeamDropdown() {
-    var rows = await sheetsGet('Team'), sel = document.getElementById('f-assignee');
-    for (var i=1;i<rows.length;i++) {
-      if (!rows[i][1]) continue;
-      var o = document.createElement('option'); o.value = rows[i][1].trim();
-      o.textContent = rows[i][0].trim()+(rows[i][2]&&rows[i][2].toLowerCase()==='manager'?' (manager)':'');
+    var result = await gasCall('getTeam'), sel = document.getElementById('f-assignee');
+    result.team.forEach(function(m) {
+      var o = document.createElement('option'); o.value = m.email;
+      o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
       sel.appendChild(o);
-    }
+    });
   }
 
   async function createTask(data) {
@@ -458,35 +461,17 @@
     return taskId;
   }
 
-  async function getMyTasks(email) {
-    var rows=await sheetsGet('Tasks'), tasks=[];
-    for (var i=1;i<rows.length;i++) {
-      var r=rows[i]; if (!r[2]) continue; if (r[2].trim().toLowerCase()!==email.toLowerCase()) continue;
-      tasks.push({ id:r[0],company:r[1],assignee:r[2],assignDate:r[3]||'',deadline:r[4]||'',brief:r[5]||'',driveUrl:r[6]||'',docUrl:r[7]||'',status:r[8]||'Da fare',assignEventId:r[9]||'',deadlineEventId:r[10]||'' });
-    }
-    tasks.sort(function(a,b){ return a.deadline<b.deadline?-1:1; });
-    return tasks;
+  async function getMyTasks() {
+    var result = await gasCall('getTasks');
+    return result.tasks || [];
   }
   async function getAllTasks() {
-    var rows=await sheetsGet('Tasks'), tasks=[];
-    for (var i=1;i<rows.length;i++) {
-      var r=rows[i]; if (!r[0]) continue;
-      tasks.push({ id:r[0],company:r[1],assignee:r[2]||'',assignDate:r[3]||'',deadline:r[4]||'',brief:r[5]||'',driveUrl:r[6]||'',docUrl:r[7]||'',status:r[8]||'Da fare',assignEventId:r[9]||'',deadlineEventId:r[10]||'' });
-    }
-    tasks.sort(function(a,b){ return a.deadline<b.deadline?-1:1; });
-    return tasks;
+    var result = await gasCall('getAllTasks');
+    return result.tasks || [];
   }
 
   async function updateTaskStatus(taskId, newStatus) {
-    var rows=await sheetsGet('Tasks'), rowIndex=-1, assignId='', deadlineId='';
-    for (var i=1;i<rows.length;i++) { if (rows[i][0]&&rows[i][0].toString()===taskId.toString()) { rowIndex=i+1; assignId=rows[i][9]||''; deadlineId=rows[i][10]||''; break; } }
-    if (rowIndex===-1) throw new Error('Task non trovato');
-    await sheetsUpdate('Tasks!I'+rowIndex, [[newStatus]]);
-    var colors=COLOR_MAP[newStatus];
-    if (colors) {
-      if (assignId)   try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+assignId,   { method:'PATCH', body:{ colorId:colors.assign } }); }   catch(e){}
-      if (deadlineId) try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+deadlineId, { method:'PATCH', body:{ colorId:colors.deadline } }); } catch(e){}
-    }
+    await gasCall('updateStatus', { taskId: taskId, status: newStatus });
   }
 
   function addOneDay(dateStr) { var d=new Date(dateStr+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+1); return d.toISOString().split('T')[0]; }
@@ -600,7 +585,7 @@
   async function loadMyTasks() {
     var c=document.getElementById('task-sections'); c.innerHTML='<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task...</div></div>';
     try {
-      var tasks=userRole==='manager' ? await getAllTasks() : await getMyTasks(userEmail);
+      var tasks=userRole==='manager' ? await getAllTasks() : await getMyTasks();
       if (!tasks.length) { c.innerHTML='<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task assegnato</div><div class="es-sub">Quando il responsabile creerà un nuovo task, comparirà qui.</div></div>'; return; }
       var s={ total:tasks.length,todo:0,progress:0,done:0 }; tasks.forEach(function(t){ var k=SK[t.status]||'todo'; s[k]++; }); renderStats(s);
       c.innerHTML=''; var grid=document.createElement('div'); grid.className='tasks-grid'; tasks.forEach(function(t){ grid.appendChild(buildTaskCard(t)); }); c.appendChild(grid);
@@ -629,18 +614,15 @@
 
   async function deleteTask(taskId) {
     if (!confirm('Eliminare questo task? Verranno rimossi anche gli eventi su Calendar e la riga dal foglio.')) return;
-    var rows=await sheetsGet('Tasks'), rowIndex=-1, assignId='', deadlineId='';
-    for (var i=1;i<rows.length;i++) { if (rows[i][0]&&rows[i][0].toString()===taskId.toString()) { rowIndex=i+1; assignId=rows[i][9]||''; deadlineId=rows[i][10]||''; break; } }
-    if (rowIndex===-1) { showToast('Task non trovato','error'); return; }
     var btn=document.getElementById('del-'+taskId); if (btn) { btn.disabled=true; btn.textContent='…'; }
-    if (assignId)   try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+assignId,   { method:'DELETE' }); } catch(e){}
-    if (deadlineId) try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+deadlineId, { method:'DELETE' }); } catch(e){}
-    var meta=await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'?fields=sheets.properties');
-    var sh=meta.sheets.find(function(s){ return s.properties.title==='Tasks'; });
-    var sheetId=sh?sh.properties.sheetId:0;
-    await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+':batchUpdate', { method:'POST', body:{ requests:[{ deleteDimension:{ range:{ sheetId:sheetId, dimension:'ROWS', startIndex:rowIndex-1, endIndex:rowIndex } } }] } });
-    showToast('✓ Task eliminato','success');
-    setTimeout(loadMyTasks,400);
+    try {
+      await gasCall('deleteTask', { taskId: taskId });
+      showToast('✓ Task eliminato','success');
+      setTimeout(loadMyTasks,400);
+    } catch(e) {
+      if (btn) { btn.disabled=false; btn.textContent='Elimina'; }
+      showToast('Errore: '+e.message,'error');
+    }
   }
 </script>
 </body>

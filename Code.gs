@@ -1,80 +1,109 @@
-// ============================================================
-// CONFIGURAZIONE — aggiorna questi valori prima del deploy
-// ============================================================
-const SHEET_ID    = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68'; // ID dello Sheet (dalla URL)
+const SHEET_ID    = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
 const CALENDAR_ID = 'primary';
-
-// colorId Calendar per stato
-// 5=Banana(giallo), 8=Graphite(grigio), 10=Basil(verde), 11=Tomato(rosso)
-const COLOR_MAP = {
+const COLOR_MAP   = {
   'Da fare':    { assign: '10', deadline: '11' },
   'In lavoro':  { assign: '10', deadline: '5'  },
   'Completato': { assign: '8',  deadline: '10' },
 };
 
-// ============================================================
-// ENTRY POINT WEBAPP
-// ============================================================
-function doGet(e) {
-  const email = Session.getActiveUser().getEmail();
-  const role  = getUserRole_(email);
-  const name  = getUserName_(email);
+// ── ENTRY POINTS ─────────────────────────────────────────────────────────────
 
-  let teamJson = '[]';
-  if (role === 'manager') {
-    try {
-      const result = getTeam();
-      if (result.success) teamJson = JSON.stringify(result.data);
-    } catch(err) { Logger.log('doGet team error: ' + err.message); }
-  }
-
-  const tpl = HtmlService.createTemplateFromFile('Index');
-  tpl.userEmail  = email;
-  tpl.userRole   = role;
-  tpl.userName   = name;
-  tpl.oauthToken = ScriptApp.getOAuthToken();
-  tpl.teamJson   = teamJson;
-
-  return tpl.evaluate()
-    .setTitle('Task Manager')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function doPost(e) {
+  try {
+    var p = JSON.parse(e.postData.contents);
+    return dispatch_(p);
+  } catch(err) { return respond_({ error: err.message }); }
 }
 
-// ============================================================
-// HELPER PRIVATI
-// ============================================================
+function doGet(e) {
+  try { return dispatch_(e.parameter); }
+  catch(err) { return respond_({ error: err.message }); }
+}
+
+// ── ROUTER ────────────────────────────────────────────────────────────────────
+
+function dispatch_(p) {
+  if (!p.token) throw new Error('Token mancante');
+  var callerEmail = verifyToken_(p.token);
+
+  switch (p.action) {
+    case 'getRole':
+      return respond_({ role: getUserRole_(callerEmail), email: callerEmail, name: getUserName_(callerEmail) });
+
+    case 'getTeam':
+      requireRole_(callerEmail, 'manager');
+      return respond_({ team: getTeam_() });
+
+    case 'getTasks':
+      return respond_({ tasks: getTasksForUser_(callerEmail) });
+
+    case 'getAllTasks':
+      requireRole_(callerEmail, 'manager');
+      return respond_({ tasks: getAllTasks_() });
+
+    case 'updateStatus':
+      updateStatus_(p.taskId, p.status, callerEmail);
+      return respond_({ ok: true });
+
+    case 'deleteTask':
+      requireRole_(callerEmail, 'manager');
+      deleteTask_(p.taskId);
+      return respond_({ ok: true });
+
+    default:
+      throw new Error('Azione non riconosciuta');
+  }
+}
+
+function respond_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── IDENTITY / AUTH ───────────────────────────────────────────────────────────
+
+function verifyToken_(token) {
+  var resp = UrlFetchApp.fetch(
+    'https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token),
+    { muteHttpExceptions: true }
+  );
+  if (resp.getResponseCode() !== 200) throw new Error('Token non valido');
+  var info = JSON.parse(resp.getContentText());
+  if (info.error_description || !info.email) throw new Error('Token non valido');
+  return info.email;
+}
+
 function getUserRole_(email) {
   try {
-    const data = SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('Team').getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][1] && data[i][1].toString().trim().toLowerCase() === email.toLowerCase()) {
-        return data[i][2].toString().trim().toLowerCase();
-      }
+    var rows = getSheet_('Team').getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][1] && rows[i][1].toString().trim().toLowerCase() === email.toLowerCase())
+        return rows[i][2].toString().trim().toLowerCase();
     }
-  } catch (err) {
-    Logger.log('getUserRole_ error: ' + err.message);
-  }
+  } catch(e) {}
   return 'unauthorized';
 }
 
 function getUserName_(email) {
   try {
-    const data = SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('Team').getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][1] && data[i][1].toString().trim().toLowerCase() === email.toLowerCase()) {
-        return data[i][0].toString().trim();
-      }
+    var rows = getSheet_('Team').getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][1] && rows[i][1].toString().trim().toLowerCase() === email.toLowerCase())
+        return rows[i][0].toString().trim();
     }
-  } catch (err) {}
+  } catch(e) {}
   return email;
 }
 
-function addOneDay_(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+function requireRole_(email, role) {
+  if (getUserRole_(email) !== role) throw new Error('Non autorizzato');
+}
+
+// ── DATA HELPERS ──────────────────────────────────────────────────────────────
+
+function getSheet_(name) {
+  return SpreadsheetApp.openById(SHEET_ID).getSheetByName(name);
 }
 
 function formatDate_(val) {
@@ -83,173 +112,97 @@ function formatDate_(val) {
   return val.toString().trim();
 }
 
+function addOneDay_(dateStr) {
+  var d = new Date(dateStr + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+}
+
+function rowToTask_(r) {
+  return {
+    id: String(r[0]), company: String(r[1]||''), assignee: String(r[2]||''),
+    assignDate: formatDate_(r[3]), deadline: formatDate_(r[4]),
+    brief: String(r[5]||''), driveUrl: String(r[6]||''), docUrl: String(r[7]||''),
+    status: String(r[8]||'Da fare'),
+    assignEventId: String(r[9]||''), deadlineEventId: String(r[10]||'')
+  };
+}
+
+function getTeam_() {
+  var rows = getSheet_('Team').getDataRange().getValues(), team = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1]) team.push({
+      name:  String(rows[i][0]||''),
+      email: rows[i][1].toString().trim(),
+      role:  (rows[i][2]||'').toString().trim().toLowerCase()
+    });
+  }
+  return team;
+}
+
+function getTasksForUser_(email) {
+  var rows = getSheet_('Tasks').getDataRange().getValues(), tasks = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][2]) continue;
+    if (rows[i][2].toString().trim().toLowerCase() !== email.toLowerCase()) continue;
+    tasks.push(rowToTask_(rows[i]));
+  }
+  return tasks.sort(function(a,b){ return a.deadline < b.deadline ? -1 : 1; });
+}
+
+function getAllTasks_() {
+  var rows = getSheet_('Tasks').getDataRange().getValues(), tasks = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    tasks.push(rowToTask_(rows[i]));
+  }
+  return tasks.sort(function(a,b){ return a.deadline < b.deadline ? -1 : 1; });
+}
+
+// ── WRITE OPERATIONS ──────────────────────────────────────────────────────────
+
+function updateStatus_(taskId, newStatus, callerEmail) {
+  var valid = ['Da fare', 'In lavoro', 'Completato'];
+  if (valid.indexOf(newStatus) === -1) throw new Error('Stato non valido');
+  var sheet = getSheet_('Tasks'), rows = sheet.getDataRange().getValues();
+  var role = getUserRole_(callerEmail);
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] || rows[i][0].toString() !== taskId.toString()) continue;
+    if (role !== 'manager' && rows[i][2].toString().trim().toLowerCase() !== callerEmail.toLowerCase())
+      throw new Error('Non autorizzato');
+    sheet.getRange(i + 1, 9).setValue(newStatus);
+    var colors = COLOR_MAP[newStatus];
+    if (colors) {
+      var assignId = String(rows[i][9]||''), deadlineId = String(rows[i][10]||'');
+      if (assignId)   tryPatchColor_(assignId,   colors.assign);
+      if (deadlineId) tryPatchColor_(deadlineId, colors.deadline);
+    }
+    return;
+  }
+  throw new Error('Task non trovato');
+}
+
+function deleteTask_(taskId) {
+  var sheet = getSheet_('Tasks'), rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] || rows[i][0].toString() !== taskId.toString()) continue;
+    var assignId = String(rows[i][9]||''), deadlineId = String(rows[i][10]||'');
+    if (assignId)   tryDeleteEvent_(assignId);
+    if (deadlineId) tryDeleteEvent_(deadlineId);
+    sheet.deleteRow(i + 1);
+    return;
+  }
+  throw new Error('Task non trovato');
+}
+
+// ── CALENDAR ──────────────────────────────────────────────────────────────────
+
 function tryPatchColor_(eventId, colorId) {
-  try {
-    Calendar.Events.patch({ colorId: colorId }, CALENDAR_ID, eventId);
-  } catch (e) {
-    Logger.log('Calendar patch error (eventId=' + eventId + '): ' + e.message);
-  }
+  try { Calendar.Events.patch({ colorId: colorId }, CALENDAR_ID, eventId); }
+  catch(e) { Logger.log('Patch color err: ' + e.message); }
 }
 
-// ============================================================
-// API PUBBLICA — chiamata via google.script.run
-// ============================================================
-
-function getTeam() {
-  try {
-    const data = SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('Team').getDataRange().getValues();
-    const members = [];
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][1]) { // ha email
-        members.push({
-          name:  data[i][0].toString().trim(),
-          email: data[i][1].toString().trim(),
-          role:  (data[i][2] || '').toString().trim().toLowerCase(),
-        });
-      }
-    }
-    return { success: true, data: members };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-}
-
-function createTask(taskData) {
-  try {
-    if (!taskData.company || !taskData.assignee ||
-        !taskData.assignDate || !taskData.deadline || !taskData.brief) {
-      return { success: false, error: 'Compila tutti i campi obbligatori.' };
-    }
-    if (taskData.deadline < taskData.assignDate) {
-      return { success: false, error: 'La deadline deve essere uguale o successiva alla data di assegnazione.' };
-    }
-
-    const now    = new Date();
-    const taskId = now.getTime().toString();
-
-    // 1. Crea Google Doc con il brief
-    const docTitle = 'Brief - ' + taskData.company + ' - ' + taskData.assignDate;
-    const doc = DocumentApp.create(docTitle);
-    doc.getBody().setText(taskData.brief);
-    doc.saveAndClose();
-    const docUrl = doc.getUrl();
-
-    // 2. Testo descrizione eventi Calendar
-    const desc = [
-      'Assegnatario: ' + taskData.assignee,
-      '',
-      'Brief:',
-      taskData.brief,
-      taskData.driveUrl ? '\nCartella Drive:\n' + taskData.driveUrl : '',
-      '\nGoogle Doc Brief:\n' + docUrl,
-    ].join('\n');
-
-    // 3. Evento assegnazione (verde, all-day)
-    const assignEvent = Calendar.Events.insert({
-      summary:     taskData.company,
-      description: desc,
-      start: { date: taskData.assignDate },
-      end:   { date: addOneDay_(taskData.assignDate) },
-      colorId: '10',
-    }, CALENDAR_ID);
-
-    // 4. Evento deadline (rosso, all-day)
-    const deadlineEvent = Calendar.Events.insert({
-      summary:     '⚠️ DEADLINE - ' + taskData.company,
-      description: desc,
-      start: { date: taskData.deadline },
-      end:   { date: addOneDay_(taskData.deadline) },
-      colorId: '11',
-    }, CALENDAR_ID);
-
-    // 5. Scrivi riga sul foglio Tasks
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName('Tasks').appendRow([
-      taskId,
-      taskData.company,
-      taskData.assignee,
-      taskData.assignDate,
-      taskData.deadline,
-      taskData.brief,
-      taskData.driveUrl || '',
-      docUrl,
-      'Da fare',
-      assignEvent.id,
-      deadlineEvent.id,
-      now.toISOString(),
-    ]);
-
-    return { success: true, taskId: taskId };
-  } catch (err) {
-    Logger.log('createTask error: ' + err.message);
-    return { success: false, error: err.message };
-  }
-}
-
-function getMyTasks(email) {
-  try {
-    const data = SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('Tasks').getDataRange().getValues();
-    const tasks = [];
-
-    for (let i = 1; i < data.length; i++) {
-      if (!data[i][2]) continue;
-      if (data[i][2].toString().trim().toLowerCase() !== email.toLowerCase()) continue;
-
-      tasks.push({
-        id:              data[i][0].toString(),
-        company:         data[i][1].toString(),
-        assignee:        data[i][2].toString(),
-        assignDate:      formatDate_(data[i][3]),
-        deadline:        formatDate_(data[i][4]),
-        brief:           data[i][5].toString(),
-        driveUrl:        data[i][6].toString(),
-        docUrl:          data[i][7].toString(),
-        status:          data[i][8].toString() || 'Da fare',
-        assignEventId:   data[i][9].toString(),
-        deadlineEventId: data[i][10].toString(),
-      });
-    }
-
-    tasks.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-    return { success: true, data: tasks };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-}
-
-function updateTaskStatus(taskId, newStatus) {
-  try {
-    const valid = ['Da fare', 'In lavoro', 'Completato'];
-    if (!valid.includes(newStatus)) {
-      return { success: false, error: 'Stato non valido.' };
-    }
-
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Tasks');
-    const data  = sheet.getDataRange().getValues();
-    let rowIndex = -1, assignId = '', deadlineId = '';
-
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0].toString() === taskId.toString()) {
-        rowIndex   = i + 1;
-        assignId   = data[i][9].toString();
-        deadlineId = data[i][10].toString();
-        break;
-      }
-    }
-
-    if (rowIndex === -1) return { success: false, error: 'Task non trovato.' };
-
-    // Aggiorna colonna Stato (col 9, 1-indexed)
-    sheet.getRange(rowIndex, 9).setValue(newStatus);
-
-    // Aggiorna colori Calendar
-    const colors = COLOR_MAP[newStatus];
-    if (assignId)   tryPatchColor_(assignId,   colors.assign);
-    if (deadlineId) tryPatchColor_(deadlineId, colors.deadline);
-
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
+function tryDeleteEvent_(eventId) {
+  try { Calendar.Events.remove(CALENDAR_ID, eventId); }
+  catch(e) { Logger.log('Delete event err: ' + e.message); }
 }
