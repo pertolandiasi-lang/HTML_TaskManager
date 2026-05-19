@@ -417,22 +417,45 @@
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
+  var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
+
+  function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
 
   window.onload = function() {
+    // Try stored token first — bypasses Google iframe entirely (fixes iOS ITP issue)
+    var stored = localStorage.getItem('tf_token');
+    var exp    = parseInt(localStorage.getItem('tf_token_exp') || '0');
+    if (stored && exp && Date.now() < exp) {
+      accessToken = stored;
+      loadUserAndInit().catch(function() { accessToken = null; _clearSession(); });
+    }
+
+    // Init Google library in parallel for when we need a fresh token
     var t = setInterval(function() {
       if (window.google && google.accounts) {
         clearInterval(t);
         tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleTokenResponse });
-        if (localStorage.getItem('tf_logged_in')) {
+
+        if (!accessToken) {
+          // No valid stored token — try silent OAuth (may fail on iOS, that's ok)
           var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
-          var _ok = !_lt || (Date.now() - _lt) < 30 * 86400000;
-          if (_ok) {
+          var _ok = _lt && (Date.now() - _lt) < 30 * 86400000;
+          if (localStorage.getItem('tf_logged_in') && _ok) {
             silentAttempt = true;
             tokenClient.requestAccessToken({ prompt: '', login_hint: localStorage.getItem('tf_hint') || '' });
-          } else {
-            ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+          } else if (localStorage.getItem('tf_logged_in')) {
+            _clearSession();
           }
         }
+
+        // Proactive refresh: renew token ~5 min before expiry while app is open
+        setInterval(function() {
+          if (!accessToken || !tokenClient) return;
+          var _exp = parseInt(localStorage.getItem('tf_token_exp') || '0');
+          if (_exp && (_exp - Date.now()) < 5 * 60 * 1000) {
+            tokenClient.requestAccessToken({ prompt: 'none', login_hint: localStorage.getItem('tf_hint') || '' });
+          }
+        }, 60000);
       }
     }, 100);
   };
@@ -445,7 +468,7 @@
   function signOut() {
     if (accessToken) google.accounts.oauth2.revoke(accessToken);
     accessToken = null;
-    ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+    _clearSession();
     document.getElementById('signin-sub').textContent = 'Gestione task del team con sync su Google Sheets, Calendar e Drive.';
     document.getElementById('app').classList.add('hidden');
     document.getElementById('signin-screen').classList.remove('hidden');
@@ -455,6 +478,7 @@
     if (resp.error) {
       if (silentAttempt) {
         silentAttempt = false;
+        // Silent/proactive refresh failed — show reconnect only if within 30 days
         var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
         if (_lt && (Date.now() - _lt) < 30 * 86400000) {
           var _n = localStorage.getItem('tf_name');
@@ -462,11 +486,13 @@
             ? 'Bentornato ' + _n + '! Tocca per continuare.'
             : 'Sessione scaduta. Tocca per continuare.';
         } else {
-          ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+          _clearSession();
         }
         document.getElementById('signin-btn').disabled = false;
         return;
       }
+      // Proactive background refresh failed silently — no UI needed
+      if (resp.error === 'interaction_required' || resp.error === 'consent_required') return;
       showToast('Errore: ' + resp.error, 'error');
       document.getElementById('signin-btn').disabled = false;
       return;
@@ -474,6 +500,10 @@
     silentAttempt = false;
     document.getElementById('signin-btn').disabled = false;
     accessToken = resp.access_token;
+    // Persist token so next open skips OAuth entirely
+    var expMs = ((resp.expires_in || 3600) - 60) * 1000;
+    localStorage.setItem('tf_token', accessToken);
+    localStorage.setItem('tf_token_exp', (Date.now() + expMs).toString());
     try { await loadUserAndInit(); } catch(e) { showToast('Errore: ' + e.message, 'error'); }
   }
 
