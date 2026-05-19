@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="Taskflow">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#16161f">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Taskflow</title>
   <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
@@ -508,18 +511,27 @@
 
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+    var _reloading = false;
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function(reg) {
+      reg.update();
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') reg.update();
+      });
+      setInterval(function() {
+        if (document.visibilityState === 'visible') reg.update();
+      }, 60000);
       reg.addEventListener('updatefound', function() {
         var sw = reg.installing;
         sw.addEventListener('statechange', function() {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            location.reload();
+          if (sw.state === 'installed' && navigator.serviceWorker.controller && !_reloading) {
+            _reloading = true; location.reload();
           }
         });
       });
     });
     navigator.serviceWorker.addEventListener('controllerchange', function() {
-      location.reload();
+      if (_reloading) return;
+      _reloading = true; location.reload();
     });
   }
 
