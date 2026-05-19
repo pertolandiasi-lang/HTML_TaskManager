@@ -207,6 +207,58 @@
     .hidden { display: none !important; }
     .ico    { width: 14px; height: 14px; flex-shrink: 0; display: inline-block; }
     .ico-sm { width: 12px; height: 12px; flex-shrink: 0; display: inline-block; }
+
+    /* ── MOBILE ─────────────────────────────────────────────── */
+    @media (max-width: 620px) {
+      .main { padding: 16px 12px 80px; }
+      .card { padding: 22px 18px; border-radius: 20px; }
+
+      /* Header */
+      .header-inner { padding: 10px 14px; gap: 8px; }
+      .brand-sub { display: none; }
+      .role-tab { padding: 5px 10px; font-size: 11px; }
+
+      /* Form header icon */
+      .form-hd { gap: 14px; margin-bottom: 24px; }
+      .form-hd-icon {
+        width: 52px; height: 52px; border-radius: 15px;
+        background: #1e3505;
+        font-size: 22px; flex-shrink: 0;
+      }
+      .form-hd-title { font-size: 19px; }
+      .form-hd-sub   { font-size: 13px; }
+
+      /* Single-column form */
+      .fg { grid-template-columns: 1fr; gap: 20px; }
+
+      /* Larger inputs — 16px prevents iOS auto-zoom */
+      input[type="text"], input[type="date"], select, textarea {
+        padding: 14px 16px; font-size: 16px; border-radius: 12px;
+      }
+      select { padding-right: 40px; background-position: right 14px center; }
+      textarea { min-height: 120px; }
+
+      /* Labels */
+      .field > label {
+        font-size: 14px; font-weight: 600;
+        color: var(--text); margin-bottom: 8px;
+      }
+
+      /* Date section */
+      .date-row { gap: 12px; }
+      .date-row > div > label {
+        display: block; font-size: 14px; font-weight: 600;
+        color: var(--text); margin-bottom: 8px;
+      }
+
+      /* Drive button */
+      .drive-btn { padding: 14px 16px; border-radius: 12px; }
+
+      /* Footer */
+      .form-ft { gap: 12px; align-items: center; }
+      .form-hint { font-size: 11px; line-height: 1.45; flex: 1; }
+      .btn-primary { padding: 14px 22px; font-size: 15px; border-radius: 12px; flex-shrink: 0; }
+    }
   </style>
 </head>
 <body>
@@ -269,10 +321,9 @@
               <div class="field fg-2"><label for="f-company">Azienda / progetto</label><input type="text" id="f-company" placeholder="es. Lumen Studio" autocomplete="off" required></div>
               <div class="field"><label for="f-assignee">Assegnatario</label><select id="f-assignee" required><option value="">— Seleziona membro —</option></select></div>
               <div class="field">
-                <label>Date</label>
                 <div class="date-row">
-                  <div><label for="f-assign-date" style="font-size:11px;margin-bottom:4px;">Inizio</label><input type="date" id="f-assign-date" required></div>
-                  <div><label for="f-deadline" style="font-size:11px;margin-bottom:4px;">Deadline</label><input type="date" id="f-deadline" required></div>
+                  <div><label for="f-assign-date">Assegnazione</label><input type="date" id="f-assign-date" required></div>
+                  <div><label for="f-deadline">Deadline</label><input type="date" id="f-deadline" required></div>
                 </div>
               </div>
               <div class="field fg-2"><label for="f-brief">Brief / istruzioni</label><textarea id="f-brief" placeholder="Descrivi obiettivo, deliverable e riferimenti…" required></textarea></div>
@@ -291,7 +342,7 @@
               </div>
             </div>
             <div class="form-ft">
-              <span class="form-hint">Sheet e Calendar verranno aggiornati</span>
+              <span class="form-hint">Verranno notificati Sheet e Calendar</span>
               <button type="submit" id="submit-btn" class="btn-primary"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crea task</button>
             </div>
           </form>
