@@ -424,8 +424,14 @@
         clearInterval(t);
         tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: handleTokenResponse });
         if (localStorage.getItem('tf_logged_in')) {
-          silentAttempt = true;
-          tokenClient.requestAccessToken({ prompt: '', login_hint: localStorage.getItem('tf_hint') || '' });
+          var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
+          var _ok = !_lt || (Date.now() - _lt) < 30 * 86400000;
+          if (_ok) {
+            silentAttempt = true;
+            tokenClient.requestAccessToken({ prompt: '', login_hint: localStorage.getItem('tf_hint') || '' });
+          } else {
+            ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+          }
         }
       }
     }, 100);
@@ -439,8 +445,8 @@
   function signOut() {
     if (accessToken) google.accounts.oauth2.revoke(accessToken);
     accessToken = null;
-    localStorage.removeItem('tf_logged_in');
-    localStorage.removeItem('tf_hint');
+    ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+    document.getElementById('signin-sub').textContent = 'Gestione task del team con sync su Google Sheets, Calendar e Drive.';
     document.getElementById('app').classList.add('hidden');
     document.getElementById('signin-screen').classList.remove('hidden');
     document.getElementById('signin-btn').disabled = false;
@@ -449,8 +455,16 @@
     if (resp.error) {
       if (silentAttempt) {
         silentAttempt = false;
-        localStorage.removeItem('tf_logged_in');
-        localStorage.removeItem('tf_hint');
+        var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
+        if (_lt && (Date.now() - _lt) < 30 * 86400000) {
+          var _n = localStorage.getItem('tf_name');
+          document.getElementById('signin-sub').textContent = _n
+            ? 'Bentornato ' + _n + '! Tocca per continuare.'
+            : 'Sessione scaduta. Tocca per continuare.';
+        } else {
+          ['tf_logged_in','tf_hint','tf_name','tf_login_time'].forEach(function(k){ localStorage.removeItem(k); });
+        }
+        document.getElementById('signin-btn').disabled = false;
         return;
       }
       showToast('Errore: ' + resp.error, 'error');
@@ -500,6 +514,8 @@
     }
     localStorage.setItem('tf_logged_in', '1');
     localStorage.setItem('tf_hint', userEmail);
+    localStorage.setItem('tf_name', userName);
+    localStorage.setItem('tf_login_time', Date.now().toString());
     document.getElementById('signin-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
   }
@@ -752,10 +768,10 @@
     }
   }
 
-  // Auto-refresh data every 60s when visible
+  // Auto-refresh data every 5 minutes when visible
   setInterval(function() {
     if (document.visibilityState === 'visible' && accessToken) refreshCurrentView();
-  }, 60000);
+  }, 300000);
 
   // Refresh immediately when app comes back to foreground
   document.addEventListener('visibilitychange', function() {
