@@ -282,6 +282,7 @@ function syncEventsForRow_(company, assignee, assignDate, deadline, brief, drive
 function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, driveUrl) {
   var docId = docUrl.replace('https://docs.google.com/document/d/', '').split('/')[0].split('?')[0];
   var doc = DocumentApp.openById(docId);
+  doc.setName('Brief - ' + company + ' - ' + assignDate + ' → ' + deadline);
   var body = doc.getBody();
   body.clear();
   body.appendParagraph(company).setHeading(DocumentApp.ParagraphHeading.HEADING1);
@@ -291,10 +292,6 @@ function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, 
   body.appendParagraph('');
   body.appendParagraph('Brief:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
   body.appendParagraph(brief || '—');
-  if (driveUrl) {
-    body.appendParagraph('');
-    body.appendParagraph('Drive: ' + driveUrl);
-  }
   doc.saveAndClose();
 }
 
@@ -322,7 +319,13 @@ function setupSheetValidation_() {
     .build();
   taskSheet.getRange(2, 3, extraRows, 1).setDataValidation(emailRule);
 
-  // Date format for assignDate (col D=4) and deadline (col E=5)
+  // Date picker for assignDate (col D=4) and deadline (col E=5)
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(false)
+    .build();
+  taskSheet.getRange(2, 4, extraRows, 1).setDataValidation(dateRule);
+  taskSheet.getRange(2, 5, extraRows, 1).setDataValidation(dateRule);
   taskSheet.getRange(2, 4, extraRows, 1).setNumberFormat('yyyy-mm-dd');
   taskSheet.getRange(2, 5, extraRows, 1).setNumberFormat('yyyy-mm-dd');
 
