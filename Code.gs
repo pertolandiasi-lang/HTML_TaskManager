@@ -16,16 +16,24 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var params = (e && e.parameter) ? e.parameter : {};
   var result;
-  try { result = dispatch_(e.parameter); }
+  try { result = dispatch_(params); }
   catch(err) { result = respond_({ error: err.message }); }
-  var cb = e.parameter && e.parameter.callback;
+  var cb = params.callback;
   if (cb) {
     return ContentService
       .createTextOutput(cb + '(' + result.getContent() + ')')
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
   return result;
+}
+
+function authorize() {
+  UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=test');
+  SpreadsheetApp.openById(SHEET_ID);
+  CalendarApp.getDefaultCalendar();
+  Logger.log('Autorizzazione completata');
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
