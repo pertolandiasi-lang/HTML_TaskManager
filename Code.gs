@@ -2,10 +2,13 @@ const SHEET_ID     = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
 const CALENDAR_ID  = 'primary';
 const DRIVE_FOLDER = '1qZdcgxj1neycYTj4BmTQhI1SbGklgowc';
 
+// Calendar colorIds: 5=Banana(yellow) 8=Graphite(grey) 10=Basil(green) 11=Tomato(red)
+// Deadline always red unless Completato (then green).
+// Creation event: red if Da fare, yellow if In lavoro, grey if Completato.
 const COLOR_MAP = {
-  'Da fare':    { assign: '9', deadline: '9' },
-  'In lavoro':  { assign: '7', deadline: '5' },
-  'Completato': { assign: '8', deadline: '8' },
+  'Da fare':    { assign: '11', deadline: '11' },
+  'In lavoro':  { assign: '5',  deadline: '11' },
+  'Completato': { assign: '8',  deadline: '10' },
 };
 
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
@@ -221,6 +224,21 @@ function deleteTask_(taskId) {
 }
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
+
+function recolorAllEvents_() {
+  var rows = getSheet_('Tasks').getDataRange().getValues();
+  var n = 0;
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    var status = String(rows[i][8] || 'Da fare');
+    var colors = COLOR_MAP[status]; if (!colors) continue;
+    var aId = String(rows[i][9] || ''), dId = String(rows[i][10] || '');
+    if (aId) tryPatchColor_(aId, colors.assign);
+    if (dId) tryPatchColor_(dId, colors.deadline);
+    n++;
+  }
+  return n;
+}
 
 function tryPatchColor_(eventId, colorId) {
   try { Calendar.Events.patch({ colorId: colorId }, CALENDAR_ID, eventId); }
