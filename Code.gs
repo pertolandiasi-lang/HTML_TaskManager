@@ -1,9 +1,11 @@
-const SHEET_ID    = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
-const CALENDAR_ID = 'primary';
-const COLOR_MAP   = {
-  'Da fare':    { assign: '10', deadline: '11' },
-  'In lavoro':  { assign: '10', deadline: '5'  },
-  'Completato': { assign: '8',  deadline: '10' },
+const SHEET_ID     = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
+const CALENDAR_ID  = 'primary';
+const DRIVE_FOLDER = '1qZdcgxj1neycYTj4BmTQhI1SbGklgowc';
+
+const COLOR_MAP = {
+  'Da fare':    { assign: '9', deadline: '9' },
+  'In lavoro':  { assign: '7', deadline: '5' },
+  'Completato': { assign: '8', deadline: '8' },
 };
 
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
@@ -33,6 +35,8 @@ function authorize() {
   UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=test');
   SpreadsheetApp.openById(SHEET_ID);
   CalendarApp.getDefaultCalendar();
+  var tmp = DocumentApp.create('_auth_test_tmp');
+  DriveApp.getFileById(tmp.getId()).setTrashed(true);
   Logger.log('Autorizzazione completata');
 }
 
@@ -64,6 +68,11 @@ function dispatch_(p) {
     case 'deleteTask':
       requireRole_(callerEmail, 'manager');
       deleteTask_(p.taskId);
+      return respond_({ ok: true });
+
+    case 'setupValidation':
+      requireRole_(callerEmail, 'manager');
+      setupSheetValidation_();
       return respond_({ ok: true });
 
     default:
@@ -221,4 +230,134 @@ function tryPatchColor_(eventId, colorId) {
 function tryDeleteEvent_(eventId) {
   try { Calendar.Events.remove(CALENDAR_ID, eventId); }
   catch(e) { Logger.log('Delete event err: ' + e.message); }
+}
+
+function syncEventsForRow_(company, assignee, assignDate, deadline, brief, driveUrl, docUrl, status, assignEventId, deadlineEventId) {
+  var colors = COLOR_MAP[status] || COLOR_MAP['Da fare'];
+  var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(docUrl?'\n\nDoc:\n'+docUrl:'');
+  if (assignEventId) {
+    try {
+      Calendar.Events.patch({
+        summary: company,
+        start: { date: assignDate },
+        end: { date: addOneDay_(assignDate) },
+        description: desc,
+        colorId: colors.assign
+      }, CALENDAR_ID, assignEventId);
+    } catch(e) { Logger.log('Sync assign event err: '+e.message); }
+  }
+  if (deadlineEventId) {
+    try {
+      Calendar.Events.patch({
+        summary: '⚠️ DEADLINE - '+company,
+        start: { date: deadline },
+        end: { date: addOneDay_(deadline) },
+        description: desc,
+        colorId: colors.deadline
+      }, CALENDAR_ID, deadlineEventId);
+    } catch(e) { Logger.log('Sync deadline event err: '+e.message); }
+  }
+}
+
+// ── GOOGLE DOC ────────────────────────────────────────────────────────────────
+
+function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, driveUrl) {
+  var docId = docUrl.replace('https://docs.google.com/document/d/', '').split('/')[0].split('?')[0];
+  var doc = DocumentApp.openById(docId);
+  var body = doc.getBody();
+  body.clear();
+  body.appendParagraph(company).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Assegnatario: ' + assignee);
+  body.appendParagraph('Data assegnazione: ' + assignDate);
+  body.appendParagraph('Deadline: ' + deadline);
+  body.appendParagraph('');
+  body.appendParagraph('Brief:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  body.appendParagraph(brief || '—');
+  if (driveUrl) {
+    body.appendParagraph('');
+    body.appendParagraph('Drive: ' + driveUrl);
+  }
+  doc.saveAndClose();
+}
+
+// ── SHEET VALIDATION SETUP (run once) ────────────────────────────────────────
+
+function setupSheetValidation_() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var taskSheet = ss.getSheetByName('Tasks');
+  var teamSheet = ss.getSheetByName('Team');
+  var extraRows = 500; // cover future rows
+
+  // Status dropdown — col I (9)
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Da fare', 'In lavoro', 'Completato'], true)
+    .setAllowInvalid(false)
+    .build();
+  taskSheet.getRange(2, 9, extraRows, 1).setDataValidation(statusRule);
+
+  // Assignee dropdown from Team!B column — col C (3)
+  var teamLast = Math.max(teamSheet.getLastRow(), 2);
+  var emailRange = teamSheet.getRange('B2:B' + teamLast);
+  var emailRule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(emailRange, true)
+    .setAllowInvalid(false)
+    .build();
+  taskSheet.getRange(2, 3, extraRows, 1).setDataValidation(emailRule);
+
+  // Date format for assignDate (col D=4) and deadline (col E=5)
+  taskSheet.getRange(2, 4, extraRows, 1).setNumberFormat('yyyy-mm-dd');
+  taskSheet.getRange(2, 5, extraRows, 1).setNumberFormat('yyyy-mm-dd');
+
+  Logger.log('Sheet validation setup completato!');
+}
+
+// ── INSTALLABLE TRIGGER: Sheet → Calendar + Doc ───────────────────────────────
+
+// Run createInstallableTrigger() ONCE from the Apps Script editor to activate.
+function createInstallableTrigger() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'onTaskSheetEdit') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onTaskSheetEdit').forSpreadsheet(ss).onEdit().create();
+  Logger.log('Trigger installato!');
+}
+
+function onTaskSheetEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== 'Tasks') return;
+    var row = e.range.getRow();
+    if (row < 2) return;
+
+    var col = e.range.getColumn();
+    // Columns that require Calendar/Doc sync (1-indexed):
+    // 2=company 3=assignee 4=assignDate 5=deadline 6=brief 7=driveUrl 9=status
+    if ([2,3,4,5,6,7,9].indexOf(col) === -1) return;
+
+    var rowData = sheet.getRange(row, 1, 1, 11).getValues()[0];
+    var taskId          = String(rowData[0]||'');
+    var company         = String(rowData[1]||'');
+    var assignee        = String(rowData[2]||'');
+    var assignDate      = formatDate_(rowData[3]);
+    var deadline        = formatDate_(rowData[4]);
+    var brief           = String(rowData[5]||'');
+    var driveUrl        = String(rowData[6]||'');
+    var docUrl          = String(rowData[7]||'');
+    var status          = String(rowData[8]||'Da fare');
+    var assignEventId   = String(rowData[9]||'');
+    var deadlineEventId = String(rowData[10]||'');
+
+    if (!taskId || !assignDate || !deadline) return;
+
+    syncEventsForRow_(company, assignee, assignDate, deadline, brief, driveUrl, docUrl, status, assignEventId, deadlineEventId);
+
+    // Update Google Doc for content-related column changes
+    if (docUrl && [2,3,4,5,6,7].indexOf(col) !== -1) {
+      updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, driveUrl);
+    }
+  } catch(err) {
+    Logger.log('onTaskSheetEdit error: ' + err.message);
+  }
 }

@@ -237,6 +237,28 @@
     }
     #ptr-pill.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+    /* ── EDIT MODAL ─────────────────────────────────────── */
+    .edit-modal-box { max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+    .modal-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .edit-fields { display: flex; flex-direction: column; gap: 16px; }
+    .edit-fields .field { display: flex; flex-direction: column; }
+    .edit-fields label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; letter-spacing: .3px; }
+    .edit-fields input[type="text"], .edit-fields input[type="date"], .edit-fields select, .edit-fields textarea { background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: inherit; font-size: 14px; padding: 10px 12px; outline: none; transition: border-color .15s; }
+    .edit-fields input:focus, .edit-fields select:focus, .edit-fields textarea:focus { border-color: var(--primary); }
+    .edit-fields textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+    .edit-fields select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238888a8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    .e-drive-link { font-size: 12px; color: var(--primary); margin-bottom: 8px; }
+    .e-drive-link a { color: inherit; }
+    .e-file-chosen { font-size: 12px; color: var(--text-2); margin-top: 6px; padding: 6px 10px; background: rgba(255,255,255,.04); border-radius: 8px; }
+    .edit-upload-drop { border: 1px dashed var(--border); border-radius: 10px; padding: 16px; text-align: center; font-size: 13px; color: var(--text-3); cursor: pointer; position: relative; transition: border-color .15s; }
+    .edit-upload-drop:hover { border-color: var(--primary); color: var(--text-2); }
+    .edit-upload-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .edit-upload-drop span { color: var(--primary); }
+
+    /* ── PENCIL BUTTON ───────────────────────────────────── */
+    .btn-pencil { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 5px; border-radius: 8px; transition: color .15s, background .15s; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-pencil:hover { color: var(--primary); background: rgba(197,240,74,.12); }
+
     .hidden { display: none !important; }
     .ico    { width: 14px; height: 14px; flex-shrink: 0; display: inline-block; }
     .ico-sm { width: 12px; height: 12px; flex-shrink: 0; display: inline-block; }
@@ -396,6 +418,61 @@
   </main>
 </div>
 
+<!-- Edit Task Modal -->
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal-box edit-modal-box">
+    <div class="modal-hd">
+      <div style="flex:1"><div class="modal-title">Modifica task</div></div>
+      <button type="button" class="modal-back" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="edit-fields">
+        <div class="field">
+          <label for="e-company">Titolo / Progetto</label>
+          <input type="text" id="e-company" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label for="e-assignee">Assegnatario</label>
+          <select id="e-assignee" required></select>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <div class="date-row">
+            <div><label for="e-assign-date" style="font-size:11px;color:var(--text-3);">Assegnazione</label><input type="date" id="e-assign-date" required></div>
+            <div><label for="e-deadline" style="font-size:11px;color:var(--text-3);">Deadline</label><input type="date" id="e-deadline" required></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="e-status">Stato</label>
+          <select id="e-status">
+            <option value="Da fare">Da fare</option>
+            <option value="In lavoro">In lavoro</option>
+            <option value="Completato">Completato</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="e-brief">Brief / istruzioni</label>
+          <textarea id="e-brief" placeholder="Descrivi obiettivo, deliverable e riferimenti…"></textarea>
+        </div>
+        <div class="field">
+          <label>Allegato Drive</label>
+          <div id="e-drive-link" class="e-drive-link hidden"></div>
+          <div class="edit-upload-drop">
+            <input type="file" id="e-file" accept="*/*" onchange="onEditFileChange(this)">
+            Trascina o <span>scegli file</span> da allegare
+          </div>
+          <div id="e-file-chosen" class="e-file-chosen hidden"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <span id="e-doc-link" class="modal-cur"></span>
+      <button type="button" class="btn-sm" onclick="closeEditModal()">Annulla</button>
+      <button type="button" class="btn-sm accent" id="e-save-btn" onclick="saveEditTask()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- Drive modal -->
 <div id="drive-modal" class="modal-overlay hidden">
   <div class="modal-box">
@@ -435,6 +512,7 @@
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
+  var teamMembers = [], _taskCache = {}, _editTask = null;
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -606,12 +684,165 @@
 
   async function loadTeamDropdown() {
     var result = await gasCall('getTeam'), sel = document.getElementById('f-assignee');
-    result.team.forEach(function(m) {
+    teamMembers = result.team || [];
+    teamMembers.forEach(function(m) {
       var o = document.createElement('option'); o.value = m.email;
       o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
       sel.appendChild(o);
     });
   }
+
+  // ── EDIT MODAL ─────────────────────────────────────────────────────────────
+
+  function openEditModal(task) {
+    _editTask = task;
+    document.getElementById('e-company').value    = task.company    || '';
+    document.getElementById('e-assign-date').value = task.assignDate || '';
+    document.getElementById('e-deadline').value   = task.deadline   || '';
+    document.getElementById('e-status').value     = task.status     || 'Da fare';
+    document.getElementById('e-brief').value      = task.brief      || '';
+    document.getElementById('e-file').value = '';
+    document.getElementById('e-file-chosen').classList.add('hidden');
+    document.getElementById('e-file-chosen').textContent = '';
+
+    var sel = document.getElementById('e-assignee');
+    sel.innerHTML = '';
+    teamMembers.forEach(function(m) {
+      var o = document.createElement('option'); o.value = m.email;
+      o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
+      if (m.email === task.assignee) o.selected = true;
+      sel.appendChild(o);
+    });
+
+    var dl = document.getElementById('e-drive-link');
+    if (task.driveUrl) {
+      dl.innerHTML = '📎 <a href="'+esc(task.driveUrl)+'" target="_blank" rel="noopener">File/cartella attuale</a>';
+      dl.classList.remove('hidden');
+    } else {
+      dl.classList.add('hidden');
+    }
+
+    var docEl = document.getElementById('e-doc-link');
+    docEl.innerHTML = task.docUrl
+      ? '<a href="'+esc(task.docUrl)+'" target="_blank" rel="noopener" style="color:var(--primary);font-size:12px;">📄 Apri Google Doc</a>'
+      : '';
+
+    document.getElementById('edit-modal').classList.remove('hidden');
+  }
+
+  function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+    _editTask = null;
+  }
+
+  document.getElementById('edit-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+  });
+
+  function onEditFileChange(input) {
+    var el = document.getElementById('e-file-chosen');
+    if (input.files && input.files[0]) {
+      el.textContent = '📎 ' + input.files[0].name;
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  async function uploadFileToDrive(file) {
+    var metadata = { name: file.name, parents: ['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] };
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, body: form
+    });
+    if (!resp.ok) { var e = await resp.json().catch(function(){return{};}); throw new Error((e.error&&e.error.message)||'Upload fallito'); }
+    var data = await resp.json();
+    await fetch('https://www.googleapis.com/drive/v3/files/'+data.id+'/permissions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+    return data.webViewLink || ('https://drive.google.com/file/d/'+data.id+'/view');
+  }
+
+  async function updateDocContent(docUrl, company, assignee, assignDate, deadline, brief, driveUrl) {
+    var docId = docUrl.replace('https://docs.google.com/document/d/', '').split('/')[0].split('?')[0];
+    var docData = await api('https://docs.googleapis.com/v1/documents/'+docId);
+    var endIndex = 1;
+    (docData.body.content||[]).forEach(function(el){ if(el.endIndex) endIndex = Math.max(endIndex, el.endIndex); });
+    var requests = [];
+    if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex - 1 } } });
+    var text = company+'\n\nAssegnatario: '+assignee+'\nData assegnazione: '+fmt(assignDate)+'\nDeadline: '+fmt(deadline)+'\n\nBrief:\n'+(brief||'—')+(driveUrl?'\n\nDrive: '+driveUrl:'');
+    requests.push({ insertText: { location: { index: 1 }, text: text } });
+    await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method: 'POST', body: { requests: requests } });
+  }
+
+  async function saveEditTask() {
+    if (!_editTask) return;
+    var btn = document.getElementById('e-save-btn');
+    btn.disabled = true; btn.textContent = 'Salvo…';
+    try {
+      var company    = document.getElementById('e-company').value.trim();
+      var assignee   = document.getElementById('e-assignee').value;
+      var assignDate = document.getElementById('e-assign-date').value;
+      var deadline   = document.getElementById('e-deadline').value;
+      var status     = document.getElementById('e-status').value;
+      var brief      = document.getElementById('e-brief').value.trim();
+      var fileInput  = document.getElementById('e-file');
+
+      if (!company || !assignee || !assignDate || !deadline) { showToast('Compila tutti i campi obbligatori','error'); btn.disabled=false; btn.textContent='Salva'; return; }
+      if (deadline < assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); btn.disabled=false; btn.textContent='Salva'; return; }
+
+      var driveUrl = _editTask.driveUrl || '';
+      if (fileInput.files && fileInput.files[0]) {
+        btn.textContent = 'Upload…';
+        driveUrl = await uploadFileToDrive(fileInput.files[0]);
+      }
+
+      btn.textContent = 'Aggiorno sheet…';
+      var sheetData = await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/Tasks!A:K');
+      var rows = sheetData.values || [];
+      var rowIndex = -1;
+      for (var i = 1; i < rows.length; i++) { if (rows[i][0] === _editTask.id) { rowIndex = i + 1; break; } }
+      if (rowIndex === -1) throw new Error('Task non trovato nel foglio');
+
+      var range = 'Tasks!B'+rowIndex+':I'+rowIndex;
+      await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=RAW', {
+        method: 'PUT', body: { values: [[company, assignee, assignDate, deadline, brief, driveUrl, _editTask.docUrl||'', status]] }
+      });
+
+      btn.textContent = 'Aggiorno doc…';
+      if (_editTask.docUrl) {
+        try { await updateDocContent(_editTask.docUrl, company, assignee, assignDate, deadline, brief, driveUrl); }
+        catch(e) { console.warn('Doc update skipped:', e.message); }
+      }
+
+      btn.textContent = 'Aggiorno calendar…';
+      var COLOR_PAIRS = { 'Da fare':{'assign':'9','deadline':'9'}, 'In lavoro':{'assign':'7','deadline':'5'}, 'Completato':{'assign':'8','deadline':'8'} };
+      var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
+      var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(_editTask.docUrl?'\n\nDoc:\n'+_editTask.docUrl:'');
+      if (_editTask.assignEventId) {
+        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }); }
+        catch(e) { console.warn('Assign event patch skipped:', e.message); }
+      }
+      if (_editTask.deadlineEventId) {
+        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.deadlineEventId, { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline } }); }
+        catch(e) { console.warn('Deadline event patch skipped:', e.message); }
+      }
+
+      showToast('✓ Task aggiornato · Sheet, Calendar e Doc sincronizzati','success');
+      closeEditModal();
+      setTimeout(loadMyTasks, 400);
+    } catch(e) {
+      showToast('Errore: '+e.message,'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salva';
+    }
+  }
+
+  // ── TASK CREATION ────────────────────────────────────────────────────────────
 
   async function createTask(data) {
     var company=data.company, assignee=data.assignee, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
@@ -809,6 +1040,7 @@
   }
 
   function buildTaskCard(task) {
+    _taskCache[task.id] = task;
     var key=SK[task.status]||'todo', d=days(task.deadline), overdue=key!=='done'&&d!==null&&d<0;
     var dlMsg=fmt(task.deadline);
     if (key!=='done'&&d!==null) { if (d<0) dlMsg+=' · in ritardo'; else if (d===0) dlMsg+=' · oggi!'; else if (d===1) dlMsg+=' · domani'; else if (d<=7) dlMsg+=' · tra '+d+' g'; }
@@ -817,8 +1049,9 @@
     if (task.driveUrl) links+='<a href="'+esc(task.driveUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Drive</a>';
     if (task.docUrl)   links+='<a href="'+esc(task.docUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Brief</a>';
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
+    var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatario: '+esc(task.assignee)+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div style="display:flex;align-items:center;gap:6px;">'+pencilBtn+'<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatario: '+esc(task.assignee)+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
