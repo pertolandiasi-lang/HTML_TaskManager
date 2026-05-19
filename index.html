@@ -426,8 +426,14 @@
     var stored = localStorage.getItem('tf_token');
     var exp    = parseInt(localStorage.getItem('tf_token_exp') || '0');
     if (stored && exp && Date.now() < exp) {
+      // Hide sign-in screen immediately so user never sees it or taps the button
+      document.getElementById('signin-screen').classList.add('hidden');
       accessToken = stored;
-      loadUserAndInit().catch(function() { accessToken = null; _clearSession(); });
+      loadUserAndInit().catch(function() {
+        accessToken = null;
+        localStorage.removeItem('tf_token'); localStorage.removeItem('tf_token_exp');
+        document.getElementById('signin-screen').classList.remove('hidden');
+      });
     }
 
     // Init Google library in parallel for when we need a fresh token
@@ -439,7 +445,7 @@
         if (!accessToken) {
           // No valid stored token — try silent OAuth (may fail on iOS, that's ok)
           var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
-          var _ok = _lt && (Date.now() - _lt) < 30 * 86400000;
+          var _ok = !_lt || (Date.now() - _lt) < 30 * 86400000;
           if (localStorage.getItem('tf_logged_in') && _ok) {
             silentAttempt = true;
             tokenClient.requestAccessToken({ prompt: '', login_hint: localStorage.getItem('tf_hint') || '' });
@@ -478,21 +484,22 @@
     if (resp.error) {
       if (silentAttempt) {
         silentAttempt = false;
-        // Silent/proactive refresh failed — show reconnect only if within 30 days
         var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
-        if (_lt && (Date.now() - _lt) < 30 * 86400000) {
-          var _n = localStorage.getItem('tf_name');
-          document.getElementById('signin-sub').textContent = _n
-            ? 'Bentornato ' + _n + '! Tocca per continuare.'
-            : 'Sessione scaduta. Tocca per continuare.';
+        var _withinWindow = localStorage.getItem('tf_logged_in') && (!_lt || (Date.now() - _lt) < 30 * 86400000);
+        if (_withinWindow) {
+          // Silent auth always fails on iOS (ITP blocks the iframe) — skip the sign-in
+          // screen entirely and auto-trigger the real OAuth flow. User just taps their
+          // Google account in the native sheet, no manual button press needed.
+          tokenClient.requestAccessToken({ prompt: 'select_account', login_hint: localStorage.getItem('tf_hint') || '' });
         } else {
           _clearSession();
+          document.getElementById('signin-btn').disabled = false;
         }
-        document.getElementById('signin-btn').disabled = false;
         return;
       }
-      // Proactive background refresh failed silently — no UI needed
-      if (resp.error === 'interaction_required' || resp.error === 'consent_required') return;
+      // Background proactive refresh or cancelled OAuth — no UI needed
+      var _silentErrs = ['interaction_required','consent_required','popup_closed_by_user','access_denied'];
+      if (_silentErrs.indexOf(resp.error) >= 0) { document.getElementById('signin-btn').disabled = false; return; }
       showToast('Errore: ' + resp.error, 'error');
       document.getElementById('signin-btn').disabled = false;
       return;
