@@ -541,7 +541,7 @@
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
-  var teamMembers = [], _taskCache = {}, _editTask = null, _editDriveUrl = '', _driveBrowserTarget = 'create';
+  var teamMembers = [], _taskCache = {}, _editTask = null, _editDriveUrl = '', _editDriveName = '', _driveBrowserTarget = 'create';
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -744,7 +744,9 @@
     });
 
     _editDriveUrl = task.driveUrl || '';
+    _editDriveName = '';
     renderEditDriveUI();
+    if (_editDriveUrl) fetchDriveName(_editDriveUrl);
 
     var docEl = document.getElementById('e-doc-link');
     docEl.innerHTML = task.docUrl
@@ -768,8 +770,7 @@
     var pick = document.getElementById('e-drive-pick');
     if (_editDriveUrl) {
       document.getElementById('e-drive-link').href = _editDriveUrl;
-      var label = _editDriveUrl.indexOf('/folders/') >= 0 ? 'Cartella attuale' : 'File attuale';
-      document.getElementById('e-drive-name').textContent = label;
+      document.getElementById('e-drive-name').textContent = _editDriveName || 'Caricamento…';
       cur.classList.remove('hidden');
       pick.classList.add('hidden');
     } else {
@@ -778,8 +779,24 @@
     }
   }
 
+  function driveIdFromUrl(url) {
+    var m = url.match(/\/folders\/([^/?]+)/) || url.match(/\/file\/d\/([^/?]+)/) || url.match(/[?&]id=([^&]+)/);
+    return m ? m[1] : '';
+  }
+
+  async function fetchDriveName(url) {
+    var id = driveIdFromUrl(url);
+    if (!id) { _editDriveName = url.indexOf('/folders/') >= 0 ? 'Cartella' : 'File'; renderEditDriveUI(); return; }
+    try {
+      var data = await api('https://www.googleapis.com/drive/v3/files/'+id+'?fields=name');
+      if (url === _editDriveUrl) { _editDriveName = data.name || 'Senza nome'; renderEditDriveUI(); }
+    } catch(e) {
+      if (url === _editDriveUrl) { _editDriveName = 'Nome non disponibile'; renderEditDriveUI(); }
+    }
+  }
+
   function clearEditDrive() {
-    _editDriveUrl = '';
+    _editDriveUrl = ''; _editDriveName = '';
     renderEditDriveUI();
   }
 
@@ -852,6 +869,7 @@
       if (fileInput.files && fileInput.files[0]) {
         btn.textContent = 'Upload…';
         driveUrl = await uploadFileToDrive(fileInput.files[0]);
+        _editDriveName = fileInput.files[0].name;
       }
 
       btn.textContent = 'Aggiorno sheet…';
@@ -996,6 +1014,7 @@
     var url = 'https://drive.google.com/drive/folders/' + cur.id;
     if (_driveBrowserTarget === 'edit') {
       _editDriveUrl = url;
+      _editDriveName = cur.name;
       renderEditDriveUI();
       closeDriveBrowser();
       return;
