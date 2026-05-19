@@ -230,6 +230,7 @@
       text-align: center;
       line-height: 1.5;
       white-space: pre-line;
+      cursor: pointer;
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
       animation: toastPop .28s cubic-bezier(.16,1,.3,1);
     }
@@ -779,13 +780,31 @@
 
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
 
-  function gasCall(action, extra) {
+  async function gasCall(action, extra) {
+    var payload = Object.assign({}, extra || {}, { action: action, token: accessToken });
+    // Try fetch POST first (works on Safari, which blocks JSONP via ITP)
+    var fetchData = null;
+    try {
+      var resp = await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      });
+      if (resp.ok) fetchData = await resp.json();
+    } catch (e) { /* network error → fall back to JSONP */ }
+    if (fetchData) {
+      if (fetchData.error) throw new Error(fetchData.error);
+      return fetchData;
+    }
+    return _gasCallJsonp(payload);
+  }
+
+  function _gasCallJsonp(payload) {
     return new Promise(function(resolve, reject) {
-      extra = extra || {};
-      extra.action = action; extra.token = accessToken;
       var cbName = '_gcb' + Date.now() + Math.random().toString(36).slice(2);
-      extra.callback = cbName;
-      var qs = Object.keys(extra).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(String(extra[k])); }).join('&');
+      payload.callback = cbName;
+      var qs = Object.keys(payload).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(String(payload[k])); }).join('&');
       var timer = setTimeout(function() {
         delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
         reject(new Error('Timeout risposta server'));
@@ -1041,6 +1060,9 @@
 
   var _tt;
   function showToast(msg, type, duration) { var t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(type||'success'); clearTimeout(_tt); _tt=setTimeout(function(){ t.className='toast hidden'; }, duration||4000); }
+  document.getElementById('toast').addEventListener('click', function() {
+    this.className = 'toast hidden'; clearTimeout(_tt);
+  });
 
   var _newTasksChecked = false;
   function checkNewTasks(tasks) {
