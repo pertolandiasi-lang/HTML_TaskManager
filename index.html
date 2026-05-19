@@ -433,7 +433,8 @@
   async function gasCall(action, extra) {
     extra = extra || {};
     extra.action = action; extra.token = accessToken;
-    var res = await fetch(GAS_URL, { method:'POST', body: JSON.stringify(extra) });
+    var qs = Object.keys(extra).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(extra[k]); }).join('&');
+    var res = await fetch(GAS_URL + '?' + qs);
     var data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;
