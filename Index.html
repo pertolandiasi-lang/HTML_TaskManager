@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Taskflow</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --bg:           #16161f;
+      --bg-2:         #1c1c28;
+      --card:         #21212e;
+      --card-2:       #27273a;
+      --border:       rgba(255,255,255,0.08);
+      --text:         #f0f0f8;
+      --text-2:       #8888a8;
+      --text-3:       #55556e;
+      --primary:      #c5f04a;
+      --primary-d:    #9bbf36;
+      --primary-fg:   #161e04;
+      --status-todo:  #ff6b6b;
+      --status-prog:  #d4b84a;
+      --status-done:  #666688;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid var(--border);
+      background: rgba(22, 22, 31, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding-top: env(safe-area-inset-top);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 32px; height: 32px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--primary-fg);
+      font-size: 16px;
+    }
+    .brand-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+    .brand-sub  { font-size: 11px; color: var(--text-2); }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    /* Role switcher pill */
+    .role-switcher {
+      display: inline-flex;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      padding: 3px;
+    }
+    .role-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      border: none;
+      background: none;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .role-tab:hover { color: var(--text); }
+    .role-tab.active {
+      background: var(--primary);
+      color: var(--primary-fg);
+      font-weight: 600;
+    }
+
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-d));
+      color: var(--primary-fg);
+      font-weight: 700;
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .role-badge {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      padding: 2px 8px; border-radius: 20px;
+      display: none;
+    }
+    .role-badge.manager  { display: inline; background: rgba(197,240,74,.12); color: var(--primary); }
+    .role-badge.employee { display: inline; background: rgba(92,201,255,.12); color: #5cc9ff; }
+
+    /* ── MAIN ────────────────────────────────────────────────── */
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    /* ── CARDS ───────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px 24px;
+    }
+
+    /* ── MANAGER GRID ────────────────────────────────────────── */
+    .manager-grid {
+      display: grid;
+      grid-template-columns: 1fr 268px;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 860px) { .manager-grid { grid-template-columns: 1fr; } }
+
+    /* Form header */
+    .form-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .form-hd-icon {
+      width: 30px; height: 30px;
+      background: rgba(197,240,74,.14);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--primary);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .form-hd-title { font-size: 14px; font-weight: 600; }
+    .form-hd-sub   { font-size: 12px; color: var(--text-2); }
+
+    /* Form grid */
+    .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .fg-2 { grid-column: 1 / -1; }
+    .field label {
+      display: block;
+      font-size: 12px; font-weight: 500;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%;
+      padding: 9px 13px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s, background .15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(197,240,74,.4);
+      background: rgba(255,255,255,.06);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.5); cursor: pointer; }
+    textarea { resize: vertical; min-height: 96px; }
+    select {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+    }
+    select option { background: #21212e; }
+
+    .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Drive picker */
+    .drive-btn {
+      width: 100%;
+      padding: 9px 13px;
+      background: rgba(255,255,255,.03);
+      border: 1px dashed rgba(197,240,74,.3);
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      transition: all .15s;
+    }
+    .drive-btn:hover { border-color: rgba(197,240,74,.5); background: rgba(255,255,255,.05); }
+    .drive-btn.selected { border-style: solid; border-color: var(--border); }
+    .drive-btn-left { display: flex; align-items: center; gap: 7px; color: var(--primary); }
+    .drive-btn.selected .drive-btn-left { color: var(--text); }
+    .drive-btn-right { font-size: 12px; color: var(--text-3); }
+    .drive-btn:hover .drive-btn-right { color: var(--primary); }
+
+    /* Form footer */
+    .form-ft {
+      margin-top: 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .form-hint { font-size: 12px; color: var(--text-3); }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 22px;
+      background: var(--primary);
+      color: var(--primary-fg);
+      border: none; border-radius: 9px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-primary:hover { opacity: .9; }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .sidebar-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .sidebar-sub   { font-size: 12px; color: var(--text-2); margin-bottom: 14px; }
+    .stat-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px; padding: 3px 0;
+    }
+    .stat-lbl { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+    .stat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .stat-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .sync-hd { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .sync-hd svg { color: var(--primary); }
+    .sync-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .sync-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+
+    /* ── EMPLOYEE VIEW ───────────────────────────────────────── */
+    .emp-hd {
+      display: flex; flex-wrap: wrap; align-items: flex-end;
+      justify-content: space-between; gap: 16px; margin-bottom: 24px;
+    }
+    .emp-title { font-size: 22px; font-weight: 700; }
+    .emp-sub   { font-size: 13px; color: var(--text-2); margin-top: 3px; }
+    .emp-sub span { color: var(--text); font-weight: 500; }
+
+    .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+    /* Task card */
+    .task-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 14px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .task-card:hover {
+      border-color: rgba(197,240,74,.22);
+      box-shadow: 0 0 0 1px rgba(197,240,74,.08);
+    }
+    .task-card.done { opacity: .65; }
+
+    .tc-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .tc-company { font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .tc-assigned { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); margin-top: 3px; }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 9999px;
+      font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,.06);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .s-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .sp-todo     { color: var(--status-todo); box-shadow: 0 0 0 1px rgba(255,107,107,.25); }
+    .sp-todo     .s-dot { background: var(--status-todo); }
+    .sp-progress { color: var(--status-prog); box-shadow: 0 0 0 1px rgba(212,184,74,.25); }
+    .sp-progress .s-dot { background: var(--status-prog); }
+    .sp-done     { color: var(--status-done); box-shadow: 0 0 0 1px rgba(102,102,136,.25); }
+    .sp-done     .s-dot { background: var(--status-done); }
+
+    .tc-brief {
+      font-size: 13px; color: var(--text-2); line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tc-deadline { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
+    .tc-deadline.overdue { color: var(--status-todo); }
+
+    .tc-links { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .tc-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      font-size: 12px; color: var(--text-2);
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: 7px; text-decoration: none;
+      transition: border-color .15s, color .15s;
+    }
+    .tc-link:hover { border-color: rgba(197,240,74,.4); color: var(--primary); }
+
+    .tc-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tc-status-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); }
+    .tc-status-sel { width: 152px; padding: 6px 30px 6px 10px; font-size: 12px; }
+
+    /* ── UPLOAD ──────────────────────────────────────────────── */
+    .upload-drop {
+      border: 1px dashed var(--border); border-radius: 9px;
+      padding: 16px; text-align: center; cursor: pointer;
+      position: relative; transition: all .15s;
+    }
+    .upload-drop:hover, .upload-drop.drag-over { border-color: rgba(197,240,74,.4); background: rgba(197,240,74,.03); }
+    .upload-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-lbl { font-size: 13px; color: var(--text-3); pointer-events: none; }
+    .upload-lbl span { color: var(--primary); }
+    .file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .file-item { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
+    .file-row  { display: flex; align-items: center; gap: 8px; }
+    .file-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-size { font-size: 11px; color: var(--text-3); }
+    .file-rm   { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; padding: 0 4px; }
+    .prog-wrap { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .prog-fill { height: 100%; background: var(--primary); width: 0%; transition: width .2s; }
+    .file-status { display: block; font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+    /* ── DRIVE MODAL ─────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px;
+      width: 100%; max-width: 500px; max-height: 80vh;
+      display: flex; flex-direction: column;
+    }
+    .modal-hd {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .modal-title { font-size: 14px; font-weight: 700; }
+    .modal-crumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    .modal-back  { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; padding: 4px 8px; white-space: nowrap; margin-top: 2px; }
+    .modal-list  { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .modal-item  { display: flex; align-items: center; gap: 12px; padding: 12px 20px; cursor: pointer; transition: background .1s; }
+    .modal-item:hover { background: rgba(255,255,255,.04); }
+    .modal-item-name { flex: 1; font-size: 14px; }
+    .modal-arrow { color: var(--text-3); font-size: 12px; }
+    .modal-state { padding: 40px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
+    .modal-ft {
+      padding: 12px 20px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .modal-cur { font-size: 12px; color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-sm {
+      padding: 7px 14px; border: 1px solid var(--border);
+      border-radius: 8px; background: rgba(255,255,255,.04);
+      color: var(--text); font-size: 13px; font-weight: 500;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-sm:hover { background: rgba(255,255,255,.08); }
+    .btn-sm.accent { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+
+    /* ── STATES ──────────────────────────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 80px 24px;
+      background: rgba(255,255,255,.02);
+      border: 1px dashed var(--border);
+      border-radius: 18px; text-align: center;
+    }
+    .es-icon  { font-size: 32px; margin-bottom: 12px; }
+    .es-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .es-sub   { font-size: 13px; color: var(--text-2); }
+
+    .unauth { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 24px; text-align: center; }
+    .unauth-icon { font-size: 48px; margin-bottom: 20px; }
+    .unauth h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .unauth p  { font-size: 14px; color: var(--text-2); max-width: 320px; line-height: 1.6; }
+
+    /* ── TOAST ───────────────────────────────────────────────── */
+    .toast {
+      position: fixed; top: 20px; right: 20px;
+      background: var(--card-2); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text);
+      font-size: 14px; padding: 12px 16px;
+      z-index: 9999; max-width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      animation: slideIn .2s cubic-bezier(.16,1,.3,1);
+    }
+    .toast.success { border-left: 3px solid var(--primary); }
+    .toast.error   { border-left: 3px solid var(--status-todo); }
+    @keyframes slideIn { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    .hidden { display: none !important; }
+    .ico { width: 14px; height: 14px; flex-shrink: 0; display: inline-block; }
+    .ico-sm { width: 12px; height: 12px; flex-shrink: 0; display: inline-block; }
+  </style>
+</head>
+<body>
+
+<script>
+  const USER_EMAIL  = <?= JSON.stringify(userEmail) ?>;
+  const USER_ROLE   = <?= JSON.stringify(userRole) ?>;
+  const USER_NAME   = <?= JSON.stringify(userName) ?>;
+  const OAUTH_TOKEN = <?= JSON.stringify(oauthToken) ?>;
+  const TEAM_JSON   = JSON.parse(<?= JSON.stringify(teamJson) ?>);
+</script>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">Taskflow</div>
+        <div class="brand-sub">Team operations</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="role-switcher" class="role-switcher hidden">
+        <button class="role-tab active" id="tab-manager" onclick="switchView('manager')">
+          <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          Responsabile
+        </button>
+        <button class="role-tab" id="tab-employee" onclick="switchView('employee')">
+          <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          I miei task
+        </button>
+      </div>
+      <div class="avatar" id="hdr-avatar">?</div>
+      <span class="role-badge" id="hdr-role"></span>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Unauthorized -->
+  <div id="view-unauth" class="hidden">
+    <div class="unauth">
+      <div class="unauth-icon">🔒</div>
+      <h2>Accesso non autorizzato</h2>
+      <p>Il tuo account non è presente nel team. Contatta il responsabile per essere aggiunto.</p>
+    </div>
+  </div>
+
+  <!-- Manager view -->
+  <div id="view-manager" class="hidden">
+    <div class="manager-grid">
+
+      <!-- Form card -->
+      <div class="card">
+        <div class="form-hd">
+          <div class="form-hd-icon">✦</div>
+          <div>
+            <div class="form-hd-title">Nuovo task</div>
+            <div class="form-hd-sub">Assegna un brief a un membro del team</div>
+          </div>
+        </div>
+        <form id="task-form" novalidate>
+          <div class="fg">
+
+            <div class="field fg-2">
+              <label for="f-company">Azienda / progetto</label>
+              <input type="text" id="f-company" placeholder="es. Lumen Studio" autocomplete="off" required>
+            </div>
+
+            <div class="field">
+              <label for="f-assignee">Assegnatario</label>
+              <select id="f-assignee" required>
+                <option value="">— Seleziona membro —</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Date</label>
+              <div class="date-row">
+                <div>
+                  <label for="f-assign-date" style="font-size:11px;margin-bottom:4px;">Inizio</label>
+                  <input type="date" id="f-assign-date" required>
+                </div>
+                <div>
+                  <label for="f-deadline" style="font-size:11px;margin-bottom:4px;">Deadline</label>
+                  <input type="date" id="f-deadline" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="field fg-2">
+              <label for="f-brief">Brief / istruzioni</label>
+              <textarea id="f-brief" placeholder="Descrivi obiettivo, deliverable e riferimenti…" required></textarea>
+            </div>
+
+            <div class="field fg-2">
+              <label>Cartella Drive (opzionale)</label>
+              <button type="button" id="drive-btn" class="drive-btn" onclick="openDriveBrowser()">
+                <span class="drive-btn-left">
+                  <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span id="drive-label">Seleziona da Google Drive</span>
+                </span>
+                <span class="drive-btn-right" id="drive-action">Sfoglia</span>
+              </button>
+              <input type="hidden" id="f-drive-url">
+            </div>
+
+            <div class="field fg-2 hidden" id="upload-group">
+              <label>Carica file nella cartella</label>
+              <div class="upload-drop" id="upload-drop">
+                <input type="file" id="f-files" multiple accept="image/*,video/*,application/pdf" onchange="handleFilesSelected(this.files)">
+                <p class="upload-lbl">Trascina o <span>scegli file</span></p>
+              </div>
+              <div id="file-list" class="file-list"></div>
+            </div>
+
+          </div>
+          <div class="form-ft">
+            <span class="form-hint">Sheet e Calendar verranno aggiornati</span>
+            <button type="submit" id="submit-btn" class="btn-primary">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Crea task
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="card">
+          <div class="sidebar-title">Panoramica team</div>
+          <div class="sidebar-sub">Stato attuale dei task</div>
+          <div id="stats-rows"></div>
+        </div>
+        <div class="card">
+          <div class="sync-hd">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Sync attivi
+          </div>
+          <ul class="sync-list">
+            <li class="sync-item">
+              <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Google Sheets · master log
+            </li>
+            <li class="sync-item">
+              <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Calendar · deadline team
+            </li>
+            <li class="sync-item">
+              <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Drive · cartelle progetto
+            </li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Employee view -->
+  <div id="view-employee" class="hidden">
+    <div class="emp-hd">
+      <div>
+        <h2 class="emp-title">I miei task</h2>
+        <p class="emp-sub">Loggato come <span id="emp-name"></span></p>
+      </div>
+    </div>
+    <div id="task-sections"></div>
+  </div>
+
+</main>
+
+<!-- Drive modal -->
+<div id="drive-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <div style="flex:1">
+        <div class="modal-title">Seleziona cartella Drive</div>
+        <div class="modal-crumb" id="drive-breadcrumb">Il mio Drive</div>
+      </div>
+      <button type="button" class="modal-back" id="drive-back-btn" onclick="driveGoBack()">← Indietro</button>
+    </div>
+    <div class="modal-list" id="drive-folder-list">
+      <div class="modal-state">Caricamento...</div>
+    </div>
+    <div class="modal-ft">
+      <span class="modal-cur" id="drive-current-name">Il mio Drive</span>
+      <button type="button" class="btn-sm" onclick="closeDriveBrowser()">Annulla</button>
+      <button type="button" class="btn-sm accent" onclick="selectCurrentFolder()">Seleziona</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── Init ─────────────────────────────────────────────────────
+  var displayName = USER_NAME || USER_EMAIL.split('@')[0];
+  document.getElementById('hdr-avatar').textContent = (displayName[0] || '?').toUpperCase();
+  document.getElementById('emp-name').textContent   = displayName;
+
+  var roleEl = document.getElementById('hdr-role');
+  if (USER_ROLE === 'manager') {
+    roleEl.textContent = 'Manager';
+    roleEl.className   = 'role-badge manager';
+    document.getElementById('role-switcher').classList.remove('hidden');
+    document.getElementById('view-manager').classList.remove('hidden');
+    var now = new Date();
+    document.getElementById('f-assign-date').value = now.toISOString().split('T')[0];
+    var dl = new Date(now); dl.setDate(dl.getDate() + 5);
+    document.getElementById('f-deadline').value = dl.toISOString().split('T')[0];
+    document.getElementById('task-form').addEventListener('submit', handleSubmit);
+    loadTeamForDropdown();
+    renderStats({ total: 0, todo: 0, progress: 0, done: 0 });
+  } else if (USER_ROLE === 'employee') {
+    roleEl.textContent = 'Dipendente';
+    roleEl.className   = 'role-badge employee';
+    document.getElementById('view-employee').classList.remove('hidden');
+    loadMyTasks();
+  } else {
+    document.getElementById('view-unauth').classList.remove('hidden');
+  }
+
+  // ─── View switcher (managers) ──────────────────────────────────
+  function switchView(v) {
+    document.getElementById('view-manager').classList.toggle('hidden', v !== 'manager');
+    document.getElementById('view-employee').classList.toggle('hidden', v !== 'employee');
+    document.getElementById('tab-manager').classList.toggle('active', v === 'manager');
+    document.getElementById('tab-employee').classList.toggle('active', v === 'employee');
+    if (v === 'employee') loadMyTasks();
+  }
+
+  // ─── Toast ────────────────────────────────────────────────────
+  var _toastTimer;
+  function showToast(msg, type) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = 'toast ' + (type || 'success');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function() { t.className = 'toast hidden'; }, 4000);
+  }
+
+  function esc(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function fmt(d)  { if (!d) return '—'; var p = d.split('-'); return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : d; }
+  function days(s) { if (!s) return null; var d = new Date(s+'T00:00:00'); var n = new Date(); n.setHours(0,0,0,0); return Math.round((d-n)/86400000); }
+
+  // ─── Team dropdown ────────────────────────────────────────────
+  function loadTeamForDropdown() {
+    var sel = document.getElementById('f-assignee');
+    if (!Array.isArray(TEAM_JSON) || !TEAM_JSON.length) return;
+    TEAM_JSON.forEach(function(m) {
+      var o = document.createElement('option');
+      o.value       = m.email;
+      o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
+      sel.appendChild(o);
+    });
+  }
+
+  // ─── Stats sidebar ────────────────────────────────────────────
+  function renderStats(s) {
+    var c = document.getElementById('stats-rows');
+    if (!c) return;
+    c.innerHTML = '';
+    [
+      { label: 'Totali',     val: s.total,    dot: null },
+      { label: 'Da fare',    val: s.todo,     dot: 'var(--status-todo)' },
+      { label: 'In lavoro',  val: s.progress, dot: 'var(--status-prog)' },
+      { label: 'Completati', val: s.done,     dot: 'var(--status-done)' },
+    ].forEach(function(r) {
+      var row = document.createElement('div');
+      row.className = 'stat-row';
+      row.innerHTML =
+        '<span class="stat-lbl">' +
+          (r.dot ? '<span class="stat-dot" style="background:'+r.dot+'"></span>' : '') +
+          r.label +
+        '</span>' +
+        '<span class="stat-val">'+r.val+'</span>';
+      c.appendChild(row);
+    });
+  }
+
+  // ─── Form submit ──────────────────────────────────────────────
+  var selectedFolderId = '', selectedFiles = [];
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    var company    = document.getElementById('f-company').value.trim();
+    var assignee   = document.getElementById('f-assignee').value;
+    var assignDate = document.getElementById('f-assign-date').value;
+    var deadline   = document.getElementById('f-deadline').value;
+    var brief      = document.getElementById('f-brief').value.trim();
+    var driveUrl   = document.getElementById('f-drive-url').value.trim();
+
+    if (!company || !assignee || !assignDate || !deadline || !brief) {
+      showToast('Compila tutti i campi obbligatori', 'error'); return;
+    }
+    if (deadline < assignDate) {
+      showToast('La deadline deve essere dopo la data di assegnazione', 'error'); return;
+    }
+
+    var btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+
+    if (selectedFiles.length > 0 && selectedFolderId) {
+      btn.textContent = 'Caricamento file...';
+      try { await uploadAllFiles(selectedFolderId); }
+      catch(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crea task';
+        return;
+      }
+    }
+
+    btn.textContent = 'Creazione...';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crea task';
+        if (!res.success) { showToast(res.error, 'error'); return; }
+        showToast('✓ Task creato! Sheet e Calendar aggiornati', 'success');
+        resetForm();
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crea task';
+        showToast('Errore: ' + err.message, 'error');
+      })
+      .createTask({ company: company, assignee: assignee, assignDate: assignDate, deadline: deadline, brief: brief, driveUrl: driveUrl });
+  }
+
+  function resetForm() {
+    document.getElementById('task-form').reset();
+    document.getElementById('f-drive-url').value = '';
+    document.getElementById('drive-label').textContent = 'Seleziona da Google Drive';
+    document.getElementById('drive-action').textContent = 'Sfoglia';
+    document.getElementById('drive-btn').className = 'drive-btn';
+    document.getElementById('upload-group').classList.add('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    selectedFiles = []; selectedFolderId = '';
+    var now = new Date();
+    document.getElementById('f-assign-date').value = now.toISOString().split('T')[0];
+    var dl = new Date(now); dl.setDate(dl.getDate() + 5);
+    document.getElementById('f-deadline').value = dl.toISOString().split('T')[0];
+  }
+
+  // ─── Drive browser ────────────────────────────────────────────
+  var driveStack = [{ id: 'root', name: 'Il mio Drive' }];
+
+  function openDriveBrowser() {
+    driveStack = [{ id: 'root', name: 'Il mio Drive' }];
+    document.getElementById('drive-modal').classList.remove('hidden');
+    loadDriveFolders('root');
+  }
+  function closeDriveBrowser() { document.getElementById('drive-modal').classList.add('hidden'); }
+
+  function updateDriveUI() {
+    var cur = driveStack[driveStack.length - 1];
+    document.getElementById('drive-breadcrumb').textContent = driveStack.map(function(f){ return f.name; }).join(' › ');
+    document.getElementById('drive-current-name').textContent = cur.name;
+    document.getElementById('drive-back-btn').style.visibility = driveStack.length > 1 ? 'visible' : 'hidden';
+  }
+
+  async function loadDriveFolders(parentId) {
+    var listEl = document.getElementById('drive-folder-list');
+    listEl.innerHTML = '<div class="modal-state">Caricamento...</div>';
+    updateDriveUI();
+    try {
+      var q = "mimeType='application/vnd.google-apps.folder' and '"+parentId+"' in parents and trashed=false";
+      var url = 'https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name)&orderBy=name&pageSize=100';
+      var res = await fetch(url, { headers: { 'Authorization': 'Bearer '+OAUTH_TOKEN } });
+      var data = await res.json();
+      if (!res.ok) { listEl.innerHTML = '<div class="modal-state">Errore: '+esc((data.error&&data.error.message)||res.status)+'</div>'; return; }
+      if (!data.files || !data.files.length) { listEl.innerHTML = '<div class="modal-state">Nessuna sottocartella</div>'; return; }
+      listEl.innerHTML = '';
+      data.files.forEach(function(folder) {
+        var item = document.createElement('div');
+        item.className = 'modal-item';
+        item.innerHTML = '<span>📁</span><span class="modal-item-name">'+esc(folder.name)+'</span><span class="modal-arrow">›</span>';
+        item.addEventListener('click', function() { driveStack.push({ id: folder.id, name: folder.name }); loadDriveFolders(folder.id); });
+        listEl.appendChild(item);
+      });
+    } catch(e) { listEl.innerHTML = '<div class="modal-state">Errore: '+esc(e.message)+'</div>'; }
+  }
+
+  function driveGoBack() {
+    if (driveStack.length <= 1) return;
+    driveStack.pop();
+    loadDriveFolders(driveStack[driveStack.length-1].id);
+  }
+
+  function selectCurrentFolder() {
+    var cur = driveStack[driveStack.length-1];
+    document.getElementById('f-drive-url').value   = 'https://drive.google.com/drive/folders/'+cur.id;
+    selectedFolderId = cur.id;
+    document.getElementById('drive-label').textContent = cur.name;
+    document.getElementById('drive-action').textContent = 'Cambia';
+    document.getElementById('drive-btn').className = 'drive-btn selected';
+    document.getElementById('upload-group').classList.remove('hidden');
+    closeDriveBrowser();
+  }
+
+  // ─── File upload ──────────────────────────────────────────────
+  var _drop = document.getElementById('upload-drop');
+  if (_drop) {
+    _drop.addEventListener('dragover',  function(e){ e.preventDefault(); _drop.classList.add('drag-over'); });
+    _drop.addEventListener('dragleave', function(){  _drop.classList.remove('drag-over'); });
+    _drop.addEventListener('drop',      function(e){ e.preventDefault(); _drop.classList.remove('drag-over'); handleFilesSelected(e.dataTransfer.files); });
+  }
+
+  function handleFilesSelected(files) {
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (!selectedFiles.find(function(x){ return x.name===f.name&&x.size===f.size; })) selectedFiles.push(f);
+    }
+    renderFileList();
+    document.getElementById('f-files').value = '';
+  }
+  function removeFile(i) { selectedFiles.splice(i,1); renderFileList(); }
+  function renderFileList() {
+    var list = document.getElementById('file-list');
+    list.innerHTML = '';
+    selectedFiles.forEach(function(f, i) {
+      var size = f.size < 1048576 ? (f.size/1024).toFixed(0)+' KB' : (f.size/1048576).toFixed(1)+' MB';
+      var item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML =
+        '<div class="file-row"><span class="file-name">'+esc(f.name)+'</span><span class="file-size">'+size+'</span><button type="button" class="file-rm" onclick="removeFile('+i+')">✕</button></div>'+
+        '<div class="prog-wrap"><div class="prog-fill" id="prog-'+i+'"></div></div>'+
+        '<span class="file-status" id="fst-'+i+'"></span>';
+      list.appendChild(item);
+    });
+  }
+  async function uploadAllFiles(folderId) {
+    for (var i = 0; i < selectedFiles.length; i++) {
+      var f = selectedFiles[i];
+      var stEl = document.getElementById('fst-'+i);
+      var prEl = document.getElementById('prog-'+i);
+      if (!stEl) continue;
+      stEl.textContent = 'Caricamento...';
+      try {
+        await uploadFile(f, folderId, function(pct){ prEl.style.width = Math.round(pct*100)+'%'; });
+        prEl.style.width = '100%'; stEl.textContent = '✓ Caricato'; stEl.style.color = 'var(--primary)';
+      } catch(err) {
+        stEl.textContent = 'Errore: '+err.message; stEl.style.color = 'var(--status-todo)'; throw err;
+      }
+    }
+  }
+  async function uploadFile(file, folderId, onProgress) {
+    var initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+      method: 'POST',
+      headers: { 'Authorization':'Bearer '+OAUTH_TOKEN, 'Content-Type':'application/json', 'X-Upload-Content-Type': file.type||'application/octet-stream', 'X-Upload-Content-Length': file.size },
+      body: JSON.stringify({ name: file.name, parents: [folderId] }),
+    });
+    if (!initRes.ok) throw new Error('Init upload fallito ('+initRes.status+')');
+    var uploadUri = initRes.headers.get('Location');
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUri);
+      xhr.setRequestHeader('Content-Type', file.type||'application/octet-stream');
+      xhr.upload.onprogress = function(e){ if (e.lengthComputable) onProgress(e.loaded/e.total); };
+      xhr.onload  = function(){ xhr.status===200||xhr.status===201 ? resolve(JSON.parse(xhr.responseText)) : reject(new Error('Upload fallito ('+xhr.status+')')); };
+      xhr.onerror = function(){ reject(new Error('Errore di rete')); };
+      xhr.send(file);
+    });
+  }
+
+  // ─── Employee task list ────────────────────────────────────────
+  var SK = { 'Da fare':'todo', 'In lavoro':'progress', 'Completato':'done' };
+
+  function loadMyTasks() {
+    var c = document.getElementById('task-sections');
+    c.innerHTML = '<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task...</div></div>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) {
+          c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Errore</div><div class="es-sub">'+esc(res.error)+'</div></div>';
+          return;
+        }
+        if (!res.data.length) {
+          c.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task assegnato</div><div class="es-sub">Quando il responsabile creerà un nuovo task, comparirà qui.</div></div>';
+          return;
+        }
+        var s = { total: res.data.length, todo: 0, progress: 0, done: 0 };
+        res.data.forEach(function(t){ var k=SK[t.status]||'todo'; s[k]++; });
+        renderStats(s);
+
+        c.innerHTML = '';
+        var grid = document.createElement('div');
+        grid.className = 'tasks-grid';
+        res.data.forEach(function(t){ grid.appendChild(buildTaskCard(t)); });
+        c.appendChild(grid);
+      })
+      .withFailureHandler(function(err) {
+        c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Errore</div><div class="es-sub">'+esc(err.message)+'</div></div>';
+      })
+      .getMyTasks(USER_EMAIL);
+  }
+
+  function buildTaskCard(task) {
+    var key  = SK[task.status] || 'todo';
+    var d    = days(task.deadline);
+    var overdue = key !== 'done' && d !== null && d < 0;
+
+    var dlMsg = fmt(task.deadline);
+    if (key !== 'done' && d !== null) {
+      if      (d < 0)  dlMsg += ' · in ritardo';
+      else if (d === 0) dlMsg += ' · oggi!';
+      else if (d === 1) dlMsg += ' · domani';
+      else if (d <= 7)  dlMsg += ' · tra '+d+' g';
+    }
+
+    var brief = task.brief.length > 160 ? task.brief.slice(0,160)+'…' : task.brief;
+    var links = '';
+    if (task.driveUrl) links += '<a href="'+esc(task.driveUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Drive</a>';
+    if (task.docUrl)   links += '<a href="'+esc(task.docUrl)+'" target="_blank" rel="noopener" class="tc-link"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Brief</a>';
+
+    var card = document.createElement('article');
+    card.className = 'task-card' + (key==='done'?' done':'');
+    card.id = 'card-'+task.id;
+    card.innerHTML =
+      '<div class="tc-hd">'+
+        '<div>'+
+          '<div class="tc-company">'+esc(task.company)+'</div>'+
+          '<div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div>'+
+        '</div>'+
+        '<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span>'+
+      '</div>'+
+      '<p class="tc-brief">'+esc(brief)+'</p>'+
+      '<div class="tc-deadline'+(overdue?' overdue':'')+'">'+
+        '<svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+
+        'Deadline '+esc(dlMsg)+
+      '</div>'+
+      (links ? '<div class="tc-links">'+links+'</div>' : '')+
+      '<div class="tc-status-row">'+
+        '<span class="tc-status-lbl">Stato</span>'+
+        '<select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)">'+
+          '<option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option>'+
+          '<option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option>'+
+          '<option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option>'+
+        '</select>'+
+      '</div>';
+    return card;
+  }
+
+  function changeStatus(taskId, newStatus) {
+    var card = document.getElementById('card-'+taskId);
+    var sel  = card.querySelector('select');
+    sel.disabled = true;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        sel.disabled = false;
+        if (!res.success) { showToast(res.error, 'error'); return; }
+        showToast('✓ Stato aggiornato · Calendar sincronizzato', 'success');
+        setTimeout(loadMyTasks, 400);
+      })
+      .withFailureHandler(function(err) {
+        sel.disabled = false;
+        showToast('Errore: '+err.message, 'error');
+      })
+      .updateTaskStatus(taskId, newStatus);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Google OAuth credentials — never commit these
+oauth.json
+token.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# macOS
+.DS_Store
+
+# clasp (Apps Script CLI) — contains script ID + auth
+.clasp.json
