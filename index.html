@@ -806,8 +806,10 @@
       await loadTeamDropdown();
     } else if (userRole === 'employee') {
       roleEl.textContent = 'Dipendente'; roleEl.className = 'role-badge employee';
-      document.getElementById('view-employee').classList.remove('hidden');
-      loadMyTasks();
+      document.getElementById('role-switcher').classList.remove('hidden');
+      document.getElementById('tab-manager').classList.add('hidden');
+      document.getElementById('tab-team').classList.add('hidden');
+      switchView('employee');
     } else {
       document.getElementById('view-unauth').classList.remove('hidden');
     }
@@ -1318,7 +1320,7 @@
     var listEl  = document.getElementById('overview-tasks');
     statsEl.innerHTML = ''; listEl.innerHTML = '<div class="ov-empty">⏳ Caricamento...</div>';
     try {
-      var all = await getAllTasks();
+      var all = userRole === 'manager' ? await getAllTasks() : await getMyTasks();
       var open = all.filter(function(t){ return t.status !== 'Completato'; });
       var todo = open.filter(function(t){ return t.status === 'Da fare'; });
       var prog = open.filter(function(t){ return t.status === 'In lavoro'; });
@@ -1382,7 +1384,8 @@
       if (dDays !== null) { if (dDays < 0) dlMsg += ' · in ritardo'; else if (dDays === 0) dlMsg += ' · oggi'; else if (dDays === 1) dlMsg += ' · domani'; else if (dDays <= 7) dlMsg += ' · tra '+dDays+'g'; }
       var row = document.createElement('div');
       row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
-      row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+esc(t.assignee)+' · '+esc(dlMsg)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
+      var meta = userRole === 'manager' ? esc(t.assignee) + ' · ' + esc(dlMsg) : esc(dlMsg);
+      row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+meta+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
       listEl.appendChild(row);
     });
   }
@@ -1410,7 +1413,6 @@
 
   function refreshCurrentView() {
     if (!accessToken) return;
-    if (userRole === 'employee') { loadMyTasks(); return; }
     if (_currentView === 'employee') loadMyTasks();
     else if (_currentView === 'team') loadTeamTasks();
     else if (_currentView === 'overview') loadOverview();
