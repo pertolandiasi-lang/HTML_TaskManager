@@ -212,6 +212,13 @@
     .toast.success { border-left: 3px solid var(--primary); }
     .toast.error   { border-left: 3px solid var(--status-todo); }
     @keyframes slideIn { from { transform: translateX(14px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes spin    { to { transform: rotate(360deg); } }
+
+    /* ── SPLASH ─────────────────────────────────────────────── */
+    #splash { position: fixed; inset: 0; background: var(--bg); z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+    .splash-icon { width: 56px; height: 56px; background: var(--primary); border-radius: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-fg); }
+    .splash-name { font-size: 20px; font-weight: 700; color: var(--text); }
+    .splash-spin { width: 22px; height: 22px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin-top: 4px; }
 
     /* ── PULL-TO-REFRESH ────────────────────────────────────── */
     #ptr-pill {
@@ -288,6 +295,11 @@
 
 <div id="toast" class="toast hidden"></div>
 <div id="ptr-pill"></div>
+<div id="splash" class="hidden">
+  <div class="splash-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <div class="splash-name">Taskflow</div>
+  <div class="splash-spin"></div>
+</div>
 
 <!-- ── SIGN-IN ────────────────────────────────────────────────── -->
 <div id="signin-screen" class="signin-screen">
@@ -426,12 +438,13 @@
     var stored = localStorage.getItem('tf_token');
     var exp    = parseInt(localStorage.getItem('tf_token_exp') || '0');
     if (stored && exp && Date.now() < exp) {
-      // Hide sign-in screen immediately so user never sees it or taps the button
       document.getElementById('signin-screen').classList.add('hidden');
+      document.getElementById('splash').classList.remove('hidden');
       accessToken = stored;
       loadUserAndInit().catch(function() {
         accessToken = null;
         localStorage.removeItem('tf_token'); localStorage.removeItem('tf_token_exp');
+        document.getElementById('splash').classList.add('hidden');
         document.getElementById('signin-screen').classList.remove('hidden');
       });
     }
@@ -553,6 +566,7 @@
     localStorage.setItem('tf_hint', userEmail);
     localStorage.setItem('tf_name', userName);
     localStorage.setItem('tf_login_time', Date.now().toString());
+    document.getElementById('splash').classList.add('hidden');
     document.getElementById('signin-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
   }
