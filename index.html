@@ -426,8 +426,8 @@
 
   async function createTask(data) {
     var company=data.company, assignee=data.assignee, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
-    var doc = await api('https://docs.googleapis.com/v1/documents', { method:'POST', body:{ title:'Brief - '+company+' - '+assignDate } });
-    var docId=doc.documentId, docUrl='https://docs.google.com/document/d/'+docId;
+    var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] } });
+    var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
     await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
     var desc='Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
     var aEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'10' } });
