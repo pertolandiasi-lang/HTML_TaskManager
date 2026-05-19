@@ -430,14 +430,29 @@
 
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
 
-  async function gasCall(action, extra) {
-    extra = extra || {};
-    extra.action = action; extra.token = accessToken;
-    var qs = Object.keys(extra).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(extra[k]); }).join('&');
-    var res = await fetch(GAS_URL + '?' + qs);
-    var data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data;
+  function gasCall(action, extra) {
+    return new Promise(function(resolve, reject) {
+      extra = extra || {};
+      extra.action = action; extra.token = accessToken;
+      var cbName = '_gcb' + Date.now() + Math.random().toString(36).slice(2);
+      extra.callback = cbName;
+      var qs = Object.keys(extra).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(String(extra[k])); }).join('&');
+      var timer = setTimeout(function() {
+        delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
+        reject(new Error('Timeout risposta server'));
+      }, 15000);
+      window[cbName] = function(data) {
+        clearTimeout(timer); delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
+        if (data.error) reject(new Error(data.error)); else resolve(data);
+      };
+      var s = document.createElement('script');
+      s.src = GAS_URL + '?' + qs;
+      s.onerror = function() {
+        clearTimeout(timer); delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
+        reject(new Error('Errore di connessione al server'));
+      };
+      document.head.appendChild(s);
+    });
   }
 
   async function loadTeamDropdown() {

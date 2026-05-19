@@ -16,8 +16,16 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  try { return dispatch_(e.parameter); }
-  catch(err) { return respond_({ error: err.message }); }
+  var result;
+  try { result = dispatch_(e.parameter); }
+  catch(err) { result = respond_({ error: err.message }); }
+  var cb = e.parameter && e.parameter.callback;
+  if (cb) {
+    return ContentService
+      .createTextOutput(cb + '(' + result.getContent() + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return result;
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
