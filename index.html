@@ -293,6 +293,10 @@
     .stat-card.urgent .stat-num { color: var(--status-todo); }
     .stat-card.prog   .stat-num { color: var(--status-prog); }
     .stat-card.todo   .stat-num { color: var(--primary); }
+    .stat-card.clickable { cursor: pointer; transition: border-color .15s, transform .12s, background .15s; }
+    .stat-card.clickable:hover { border-color: var(--text-3); background: var(--card-2); }
+    .stat-card.clickable:active { transform: scale(.97); }
+    .stat-card.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); background: rgba(197,240,74,.04); }
     .ov-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
     .ov-row.overdue { border-left: 3px solid var(--status-todo); }
     .ov-row-title { flex: 1; min-width: 0; }
@@ -508,7 +512,7 @@
     <div id="view-overview" class="hidden">
       <div class="emp-hd"><div><h2 class="emp-title">Overview</h2><p class="emp-sub">Riepilogo task aperti</p></div></div>
       <div id="overview-stats" class="stat-cards"></div>
-      <div class="section-hd" style="margin-top:24px">Task aperti</div>
+      <div id="overview-list-title" class="section-hd" style="margin-top:24px">Task aperti</div>
       <div id="overview-tasks"></div>
     </div>
   </main>
@@ -1306,6 +1310,9 @@
     }
   }
 
+  var _overviewFilter = 'all';
+  var _overviewData = null;
+
   async function loadOverview() {
     var statsEl = document.getElementById('overview-stats');
     var listEl  = document.getElementById('overview-tasks');
@@ -1321,39 +1328,68 @@
         var d = new Date(t.deadline + 'T00:00:00');
         return d < today;
       });
-      var cards = [
-        { lbl: 'Totale aperti', val: open.length, cls: '' },
-        { lbl: 'Da fare',       val: todo.length, cls: 'todo' },
-        { lbl: 'In lavoro',     val: prog.length, cls: 'prog' },
-        { lbl: 'In ritardo',    val: overdue.length, cls: 'urgent' }
-      ];
-      statsEl.innerHTML = cards.map(function(c){
-        return '<div class="stat-card '+c.cls+'"><div class="stat-num">'+c.val+'</div><div class="stat-lbl">'+c.lbl+'</div></div>';
-      }).join('');
-
-      if (!open.length) {
-        listEl.innerHTML = '<div class="ov-empty">🎉 Nessun task aperto</div>';
-        return;
-      }
-      open.sort(function(a,b){
+      var sortByDeadline = function(a,b) {
         if (!a.deadline) return 1; if (!b.deadline) return -1;
         return a.deadline < b.deadline ? -1 : a.deadline > b.deadline ? 1 : 0;
-      });
-      listEl.innerHTML = '';
-      open.forEach(function(t) {
-        var key = SK[t.status] || 'todo';
-        var d = days(t.deadline);
-        var isOverdue = d !== null && d < 0;
-        var dlMsg = fmt(t.deadline);
-        if (d !== null) { if (d < 0) dlMsg += ' · in ritardo'; else if (d === 0) dlMsg += ' · oggi'; else if (d === 1) dlMsg += ' · domani'; else if (d <= 7) dlMsg += ' · tra '+d+'g'; }
-        var row = document.createElement('div');
-        row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
-        row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+esc(t.assignee)+' · '+esc(dlMsg)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
-        listEl.appendChild(row);
-      });
+      };
+      open.sort(sortByDeadline); todo.sort(sortByDeadline); prog.sort(sortByDeadline); overdue.sort(sortByDeadline);
+      _overviewData = { open: open, todo: todo, prog: prog, overdue: overdue };
+      renderOverview();
     } catch(e) {
       listEl.innerHTML = '<div class="ov-empty">⚠️ '+esc(e.message)+'</div>';
     }
+  }
+
+  function renderOverview() {
+    if (!_overviewData) return;
+    var d = _overviewData;
+    var statsEl = document.getElementById('overview-stats');
+    var listEl  = document.getElementById('overview-tasks');
+    var titleEl = document.getElementById('overview-list-title');
+
+    var cards = [
+      { key: 'all',     lbl: 'Totale aperti', val: d.open.length,    cls: '',       clickable: false },
+      { key: 'todo',    lbl: 'Da fare',       val: d.todo.length,    cls: 'todo',   clickable: true  },
+      { key: 'prog',    lbl: 'In lavoro',     val: d.prog.length,    cls: 'prog',   clickable: true  },
+      { key: 'overdue', lbl: 'In ritardo',    val: d.overdue.length, cls: 'urgent', clickable: true  }
+    ];
+    statsEl.innerHTML = cards.map(function(c) {
+      var classes = 'stat-card ' + c.cls
+        + (c.clickable ? ' clickable' : '')
+        + (c.clickable && _overviewFilter === c.key ? ' active' : '');
+      var attr = c.clickable ? ' onclick="setOverviewFilter(\''+c.key+'\')"' : '';
+      return '<div class="'+classes.trim()+'"'+attr+'><div class="stat-num">'+c.val+'</div><div class="stat-lbl">'+esc(c.lbl)+'</div></div>';
+    }).join('');
+
+    var titles = { all: 'Task aperti', todo: 'Da fare', prog: 'In lavoro', overdue: 'In ritardo' };
+    titleEl.textContent = titles[_overviewFilter] || 'Task aperti';
+
+    var list = _overviewFilter === 'todo' ? d.todo
+             : _overviewFilter === 'prog' ? d.prog
+             : _overviewFilter === 'overdue' ? d.overdue
+             : d.open;
+
+    if (!list.length) {
+      listEl.innerHTML = '<div class="ov-empty">🎉 Nessun task in questa categoria</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    list.forEach(function(t) {
+      var key = SK[t.status] || 'todo';
+      var dDays = days(t.deadline);
+      var isOverdue = dDays !== null && dDays < 0;
+      var dlMsg = fmt(t.deadline);
+      if (dDays !== null) { if (dDays < 0) dlMsg += ' · in ritardo'; else if (dDays === 0) dlMsg += ' · oggi'; else if (dDays === 1) dlMsg += ' · domani'; else if (dDays <= 7) dlMsg += ' · tra '+dDays+'g'; }
+      var row = document.createElement('div');
+      row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
+      row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+esc(t.assignee)+' · '+esc(dlMsg)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
+      listEl.appendChild(row);
+    });
+  }
+
+  function setOverviewFilter(f) {
+    _overviewFilter = (_overviewFilter === f) ? 'all' : f;
+    renderOverview();
   }
 
   function buildTaskCard(task) {
