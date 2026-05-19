@@ -249,6 +249,10 @@
     .edit-fields select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238888a8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
     .e-drive-link { font-size: 12px; color: var(--primary); margin-bottom: 8px; }
     .e-drive-link a { color: inherit; }
+    .e-drive-cur { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; }
+    .e-drive-link-a { flex: 1; font-size: 13px; color: var(--primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .e-drive-link-a:hover { text-decoration: underline; }
+    .e-drive-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .e-file-chosen { font-size: 12px; color: var(--text-2); margin-top: 6px; padding: 6px 10px; background: rgba(255,255,255,.04); border-radius: 8px; }
     .edit-upload-drop { border: 1px dashed var(--border); border-radius: 10px; padding: 16px; text-align: center; font-size: 13px; color: var(--text-3); cursor: pointer; position: relative; transition: border-color .15s; }
     .edit-upload-drop:hover { border-color: var(--primary); color: var(--text-2); }
@@ -455,8 +459,21 @@
           <textarea id="e-brief" placeholder="Descrivi obiettivo, deliverable e riferimenti…"></textarea>
         </div>
         <div class="field">
-          <label>Allegato Drive</label>
-          <div id="e-drive-link" class="e-drive-link hidden"></div>
+          <label>Cartella Drive</label>
+          <div id="e-drive-cur" class="e-drive-cur hidden">
+            <a id="e-drive-link" href="#" target="_blank" rel="noopener" class="e-drive-link-a">📎 <span id="e-drive-name">Cartella attuale</span></a>
+            <div class="e-drive-actions">
+              <button type="button" class="btn-sm" onclick="openDriveBrowserForEdit()">Cambia</button>
+              <button type="button" class="btn-sm" onclick="clearEditDrive()">Rimuovi</button>
+            </div>
+          </div>
+          <button type="button" id="e-drive-pick" class="drive-btn hidden" onclick="openDriveBrowserForEdit()">
+            <span class="drive-btn-left"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Seleziona da Google Drive</span>
+            <span class="drive-btn-right">Sfoglia</span>
+          </button>
+        </div>
+        <div class="field">
+          <label>Carica file</label>
           <div class="edit-upload-drop">
             <input type="file" id="e-file" accept="*/*" onchange="onEditFileChange(this)">
             Trascina o <span>scegli file</span> da allegare
@@ -512,7 +529,7 @@
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
-  var teamMembers = [], _taskCache = {}, _editTask = null;
+  var teamMembers = [], _taskCache = {}, _editTask = null, _editDriveUrl = '', _driveBrowserTarget = 'create';
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -714,13 +731,8 @@
       sel.appendChild(o);
     });
 
-    var dl = document.getElementById('e-drive-link');
-    if (task.driveUrl) {
-      dl.innerHTML = '📎 <a href="'+esc(task.driveUrl)+'" target="_blank" rel="noopener">File/cartella attuale</a>';
-      dl.classList.remove('hidden');
-    } else {
-      dl.classList.add('hidden');
-    }
+    _editDriveUrl = task.driveUrl || '';
+    renderEditDriveUI();
 
     var docEl = document.getElementById('e-doc-link');
     docEl.innerHTML = task.docUrl
@@ -738,6 +750,33 @@
   document.getElementById('edit-modal').addEventListener('click', function(e) {
     if (e.target === this) closeEditModal();
   });
+
+  function renderEditDriveUI() {
+    var cur = document.getElementById('e-drive-cur');
+    var pick = document.getElementById('e-drive-pick');
+    if (_editDriveUrl) {
+      document.getElementById('e-drive-link').href = _editDriveUrl;
+      var label = _editDriveUrl.indexOf('/folders/') >= 0 ? 'Cartella attuale' : 'File attuale';
+      document.getElementById('e-drive-name').textContent = label;
+      cur.classList.remove('hidden');
+      pick.classList.add('hidden');
+    } else {
+      cur.classList.add('hidden');
+      pick.classList.remove('hidden');
+    }
+  }
+
+  function clearEditDrive() {
+    _editDriveUrl = '';
+    renderEditDriveUI();
+  }
+
+  function openDriveBrowserForEdit() {
+    _driveBrowserTarget = 'edit';
+    driveStack = [{ id: 'root', name: 'Il mio Drive' }];
+    document.getElementById('drive-modal').classList.remove('hidden');
+    loadDriveFolders('root');
+  }
 
   function onEditFileChange(input) {
     var el = document.getElementById('e-file-chosen');
@@ -797,7 +836,7 @@
       if (!company || !assignee || !assignDate || !deadline) { showToast('Compila tutti i campi obbligatori','error'); btn.disabled=false; btn.textContent='Salva'; return; }
       if (deadline < assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); btn.disabled=false; btn.textContent='Salva'; return; }
 
-      var driveUrl = _editTask.driveUrl || '';
+      var driveUrl = _editDriveUrl || '';
       if (fileInput.files && fileInput.files[0]) {
         btn.textContent = 'Upload…';
         driveUrl = await uploadFileToDrive(fileInput.files[0]);
@@ -921,7 +960,7 @@
   }
 
   var driveStack=[{id:'root',name:'Il mio Drive'}];
-  function openDriveBrowser() { driveStack=[{id:'root',name:'Il mio Drive'}]; document.getElementById('drive-modal').classList.remove('hidden'); loadDriveFolders('root'); }
+  function openDriveBrowser() { _driveBrowserTarget='create'; driveStack=[{id:'root',name:'Il mio Drive'}]; document.getElementById('drive-modal').classList.remove('hidden'); loadDriveFolders('root'); }
   function closeDriveBrowser() { document.getElementById('drive-modal').classList.add('hidden'); }
   function updateDriveUI() { var cur=driveStack[driveStack.length-1]; document.getElementById('drive-breadcrumb').textContent=driveStack.map(function(f){ return f.name; }).join(' › '); document.getElementById('drive-current-name').textContent=cur.name; document.getElementById('drive-back-btn').style.visibility=driveStack.length>1?'visible':'hidden'; }
   async function loadDriveFolders(parentId) {
@@ -941,8 +980,16 @@
   }
   function driveGoBack() { if (driveStack.length<=1) return; driveStack.pop(); loadDriveFolders(driveStack[driveStack.length-1].id); }
   function selectCurrentFolder() {
-    var cur=driveStack[driveStack.length-1]; document.getElementById('f-drive-url').value='https://drive.google.com/drive/folders/'+cur.id; selectedFolderId=cur.id;
-    document.getElementById('drive-label').textContent=cur.name; document.getElementById('drive-action').textContent='Cambia'; document.getElementById('drive-btn').className='drive-btn selected';
+    var cur = driveStack[driveStack.length-1];
+    var url = 'https://drive.google.com/drive/folders/' + cur.id;
+    if (_driveBrowserTarget === 'edit') {
+      _editDriveUrl = url;
+      renderEditDriveUI();
+      closeDriveBrowser();
+      return;
+    }
+    document.getElementById('f-drive-url').value = url; selectedFolderId = cur.id;
+    document.getElementById('drive-label').textContent = cur.name; document.getElementById('drive-action').textContent = 'Cambia'; document.getElementById('drive-btn').className = 'drive-btn selected';
     document.getElementById('upload-group').classList.remove('hidden'); closeDriveBrowser();
   }
 
