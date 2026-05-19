@@ -424,6 +424,9 @@
         });
       });
     });
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      location.reload();
+    });
   }
 
   const CLIENT_ID = '848444804320-ndpeev8k3bs0o71h7orac09liohr7kmc.apps.googleusercontent.com';
