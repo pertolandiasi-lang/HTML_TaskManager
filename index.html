@@ -76,8 +76,12 @@
     .menu-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 9999px; padding: 8px 16px; color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .menu-btn:hover { background: var(--card-2); }
     .menu-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 90; }
-    .nav-menu { position: fixed; right: 12px; width: 232px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px; z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,.55); }
+    .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 90; opacity: 0; transition: opacity .2s ease; }
+    .nav-overlay.open { opacity: 1; }
+    .nav-menu { position: fixed; width: 232px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px; z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,.55); opacity: 0; transform: scale(.92); transform-origin: top right; transition: opacity .18s ease, transform .2s cubic-bezier(.16,1,.3,1); }
+    .nav-menu.open { opacity: 1; transform: scale(1); }
+    .nav-menu.centered { transform-origin: center; transform: translate(-50%,-50%) scale(.92); }
+    .nav-menu.centered.open { transform: translate(-50%,-50%) scale(1); }
     .nav-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 11px 12px; border-radius: 9px; border: none; background: none; color: var(--text-2); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
     .nav-item:hover { background: var(--card-2); color: var(--text); }
     .nav-item.active { background: var(--primary); color: var(--primary-fg); }
@@ -477,7 +481,7 @@
       <div class="header-right">
         <button id="menu-btn" class="menu-btn hidden" onclick="toggleMenu()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          <span id="menu-label">Menu</span>
+          <span>Menu</span>
         </button>
         <div class="avatar" id="hdr-avatar" onclick="signOut()" title="Esci">?</div>
         <span class="role-badge" id="hdr-role"></span>
@@ -1240,7 +1244,6 @@
   }
 
   var _currentView = 'manager';
-  var VIEW_LABELS = { manager:'Crea Task', employee:'I miei task', team:'Team', calendar:'Calendario', overview:'Overview', search:'Cerca' };
 
   function switchView(v) {
     _currentView = v;
@@ -1252,8 +1255,6 @@
     for (var i = 0; i < items.length; i++) {
       items[i].classList.toggle('active', items[i].dataset.view === v);
     }
-    var lbl = document.getElementById('menu-label');
-    if (lbl) lbl.textContent = VIEW_LABELS[v] || 'Menu';
     if (v === 'employee') loadMyTasks();
     if (v === 'team') loadTeamTasks();
     if (v === 'calendar') loadCalendar();
@@ -1263,18 +1264,37 @@
 
   function toggleMenu() {
     var menu = document.getElementById('nav-menu');
-    if (menu.classList.contains('hidden')) openMenu(); else closeMenu();
+    if (menu.classList.contains('open')) closeMenu(); else openMenu();
   }
   function openMenu() {
-    var hdr = document.querySelector('.header');
     var menu = document.getElementById('nav-menu');
-    menu.style.top = (hdr.getBoundingClientRect().bottom + 6) + 'px';
+    var overlay = document.getElementById('nav-overlay');
+    if (window.innerWidth <= 620) {
+      menu.classList.add('centered');
+      menu.style.top = '50%'; menu.style.left = '50%'; menu.style.right = 'auto';
+    } else {
+      menu.classList.remove('centered');
+      var r = document.getElementById('menu-btn').getBoundingClientRect();
+      menu.style.top = (r.bottom + 8) + 'px';
+      menu.style.right = (window.innerWidth - r.right) + 'px';
+      menu.style.left = 'auto';
+    }
     menu.classList.remove('hidden');
-    document.getElementById('nav-overlay').classList.remove('hidden');
+    overlay.classList.remove('hidden');
+    requestAnimationFrame(function() {
+      menu.classList.add('open');
+      overlay.classList.add('open');
+    });
   }
   function closeMenu() {
-    document.getElementById('nav-menu').classList.add('hidden');
-    document.getElementById('nav-overlay').classList.add('hidden');
+    var menu = document.getElementById('nav-menu');
+    var overlay = document.getElementById('nav-overlay');
+    menu.classList.remove('open');
+    overlay.classList.remove('open');
+    setTimeout(function() {
+      menu.classList.add('hidden');
+      overlay.classList.add('hidden');
+    }, 200);
   }
   function navTo(v) { switchView(v); closeMenu(); }
 
