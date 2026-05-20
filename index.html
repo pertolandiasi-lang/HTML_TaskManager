@@ -205,7 +205,9 @@
 
     /* ── DRIVE MODAL ─────────────────────────────────────────── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; }
+    .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; animation: modalPop .24s cubic-bezier(.16,1,.3,1); }
+    @keyframes modalPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    #task-detail-body { background: var(--bg); }
     .modal-hd { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
     .modal-title { font-size: 14px; font-weight: 700; }
     .modal-crumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
@@ -312,7 +314,8 @@
     .stat-card.clickable:hover { border-color: var(--text-3); background: var(--card-2); }
     .stat-card.clickable:active { transform: scale(.97); }
     .stat-card.active { border-color: var(--primary-light); box-shadow: 0 0 0 1px var(--primary-light); background: rgba(174,139,245,.04); }
-    .ov-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+    .ov-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: background .15s; }
+    .ov-row:hover { background: var(--card-2); }
     .ov-row.overdue { border-left: 3px solid var(--status-todo); }
     .ov-row-title { flex: 1; min-width: 0; }
     .ov-row-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -687,6 +690,17 @@
   </div>
 </div>
 
+<!-- Task detail modal -->
+<div id="task-detail-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <div style="flex:1"><div class="modal-title">Dettaglio task</div></div>
+      <button type="button" class="modal-back" onclick="closeTaskDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="task-detail-body"></div>
+  </div>
+</div>
+
 <!-- Assignee picker modal -->
 <div id="assignee-modal" class="modal-overlay hidden">
   <div class="modal-box">
@@ -871,6 +885,23 @@
   document.getElementById('assignee-modal').addEventListener('click', function(e) {
     if (e.target === this) closeAssigneeModal();
   });
+
+  // ── TASK DETAIL MODAL ───────────────────────────────────────────────────────
+  function openTaskDetail(taskId) {
+    var task = _taskCache[taskId];
+    if (!task) return;
+    var body = document.getElementById('task-detail-body');
+    body.innerHTML = '';
+    body.appendChild(buildTaskCard(task));
+    document.getElementById('task-detail-modal').classList.remove('hidden');
+  }
+  function closeTaskDetail() {
+    document.getElementById('task-detail-modal').classList.add('hidden');
+  }
+  document.getElementById('task-detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeTaskDetail();
+  });
+
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -1074,6 +1105,7 @@
   // ── EDIT MODAL ─────────────────────────────────────────────────────────────
 
   function openEditModal(task) {
+    closeTaskDetail();
     _editTask = task;
     document.getElementById('e-company').value    = task.company    || '';
     document.getElementById('e-assign-date').value = task.assignDate || '';
@@ -1600,10 +1632,12 @@
     var isOverdue = dDays !== null && dDays < 0;
     var dlMsg = fmt(t.deadline);
     if (dDays !== null) { if (dDays < 0) dlMsg += ' · in ritardo'; else if (dDays === 0) dlMsg += ' · oggi'; else if (dDays === 1) dlMsg += ' · domani'; else if (dDays <= 7) dlMsg += ' · tra '+dDays+'g'; }
+    _taskCache[t.id] = t;
     var row = document.createElement('div');
     row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
     var meta = showAssignee ? esc(assigneeNames(t)) + ' · ' + esc(dlMsg) : esc(dlMsg);
     row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+meta+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
+    row.addEventListener('click', function(){ openTaskDetail(t.id); });
     return row;
   }
   function ovGroupHeader(label, count) {
@@ -1757,8 +1791,9 @@
   }
 
   function calRowHtml(t) {
+    _taskCache[t.id] = t;
     var key = SK[t.status] || 'todo';
-    return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
+    return '<div class="ov-row" onclick="openTaskDetail(\''+esc(t.id)+'\')"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
   }
 
   function calTasksHtml(tasks) {
@@ -1905,7 +1940,7 @@
 
   async function changeStatus(taskId, newStatus) {
     var card=document.getElementById('card-'+taskId), sel=card.querySelector('select'); sel.disabled=true;
-    try { await updateTaskStatus(taskId,newStatus); showToast('✓ Stato aggiornato · Calendar sincronizzato','success'); setTimeout(refreshCurrentView,400); }
+    try { await updateTaskStatus(taskId,newStatus); showToast('✓ Stato aggiornato · Calendar sincronizzato','success'); closeTaskDetail(); setTimeout(refreshCurrentView,400); }
     catch(e) { sel.disabled=false; showToast('Errore: '+e.message,'error'); }
   }
 
@@ -1915,6 +1950,7 @@
     try {
       await gasCall('deleteTask', { taskId: taskId });
       showToast('✓ Task eliminato','success');
+      closeTaskDetail();
       setTimeout(refreshCurrentView,400);
     } catch(e) {
       if (btn) { btn.disabled=false; btn.textContent='Elimina'; }
