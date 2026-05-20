@@ -304,6 +304,16 @@
     .ov-row-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
     .ov-row .status-pill { flex-shrink: 0; }
     .ov-empty { padding: 32px 20px; text-align: center; color: var(--text-2); background: var(--card); border: 1px dashed var(--border); border-radius: 14px; }
+    .grp-toggle { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 9999px; padding: 3px; margin: 20px 0 6px; }
+    .grp-btn { padding: 6px 16px; border-radius: 9999px; font-size: 12px; font-weight: 600; border: none; background: none; color: var(--text-2); cursor: pointer; font-family: inherit; }
+    .grp-btn.active { background: var(--primary); color: var(--primary-fg); }
+    .ov-group-hd { font-size: 13px; font-weight: 700; color: var(--text-2); margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
+    .ov-group-count { font-size: 11px; color: var(--text-3); font-weight: 600; background: var(--card-2); padding: 1px 8px; border-radius: 9999px; }
+    .assignee-list { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: 12px; padding: 6px; max-height: 220px; overflow-y: auto; background: var(--bg-2); }
+    .assignee-opt { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+    .assignee-opt:hover { background: var(--card-2); }
+    .assignee-opt input { width: 17px; height: 17px; accent-color: var(--primary); flex-shrink: 0; }
+    .assignee-opt span { font-size: 14px; color: var(--text); }
 
     /* ── IN-APP CALENDAR ────────────────────────────────── */
     .cal-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
@@ -499,7 +509,7 @@
           <form id="task-form" novalidate>
             <div class="fg">
               <div class="field fg-2"><label for="f-company">Azienda / progetto</label><input type="text" id="f-company" placeholder="es. Lumen Studio" autocomplete="off" required></div>
-              <div class="field"><label for="f-assignee">Assegnatario</label><select id="f-assignee" required><option value="">— Seleziona membro —</option></select></div>
+              <div class="field fg-2"><label>Assegnatari</label><div class="assignee-list" id="f-assignee-list"></div></div>
               <div class="field">
                 <div class="date-row">
                   <div><label for="f-assign-date">Assegnazione</label><input type="date" id="f-assign-date" required></div>
@@ -561,7 +571,7 @@
     <div id="view-overview" class="hidden">
       <div class="emp-hd"><div><h2 class="emp-title">Overview</h2><p class="emp-sub">Riepilogo task aperti</p></div></div>
       <div id="overview-stats" class="stat-cards"></div>
-      <div id="overview-list-title" class="section-hd" style="margin-top:24px">Task aperti</div>
+      <div id="overview-grouptoggle" class="grp-toggle hidden"></div>
       <div id="overview-tasks"></div>
     </div>
   </main>
@@ -581,8 +591,8 @@
           <input type="text" id="e-company" autocomplete="off" required>
         </div>
         <div class="field">
-          <label for="e-assignee">Assegnatario</label>
-          <select id="e-assignee" required></select>
+          <label>Assegnatari</label>
+          <div class="assignee-list" id="e-assignee-list"></div>
         </div>
         <div class="field">
           <label>Date</label>
@@ -727,6 +737,44 @@
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
   var teamMembers = [], _taskCache = {}, _editTask = null, _editDriveUrl = '', _editDriveName = '', _driveBrowserTarget = 'create';
+
+  function nameOf(email) {
+    if (!email) return '';
+    var e = email.trim().toLowerCase();
+    for (var i = 0; i < teamMembers.length; i++) {
+      if (teamMembers[i].email.toLowerCase() === e) return teamMembers[i].name;
+    }
+    return email.trim();
+  }
+  function taskAssignees(task) {
+    if (!task || !task.assignee) return [];
+    return task.assignee.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  function assigneeNames(task) {
+    var list = taskAssignees(task).map(nameOf);
+    return list.length ? list.join(', ') : '—';
+  }
+  function isAssignedTo(task, email) {
+    if (!task || !task.assignee || !email) return false;
+    var e = email.toLowerCase();
+    return taskAssignees(task).some(function(a){ return a.toLowerCase() === e; });
+  }
+  function renderAssigneeCheckboxes(containerId, selectedEmails) {
+    var box = document.getElementById(containerId);
+    box.innerHTML = '';
+    var sel = (selectedEmails || []).map(function(e){ return e.toLowerCase(); });
+    teamMembers.forEach(function(m) {
+      var lbl = document.createElement('label'); lbl.className = 'assignee-opt';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = m.email;
+      if (sel.indexOf(m.email.toLowerCase()) >= 0) cb.checked = true;
+      var sp = document.createElement('span'); sp.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
+      lbl.appendChild(cb); lbl.appendChild(sp);
+      box.appendChild(lbl);
+    });
+  }
+  function getCheckedAssignees(containerId) {
+    return Array.prototype.slice.call(document.querySelectorAll('#'+containerId+' input:checked')).map(function(c){ return c.value; });
+  }
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -921,13 +969,9 @@
   }
 
   async function loadTeamDropdown() {
-    var result = await gasCall('getTeam'), sel = document.getElementById('f-assignee');
+    var result = await gasCall('getTeam');
     teamMembers = result.team || [];
-    teamMembers.forEach(function(m) {
-      var o = document.createElement('option'); o.value = m.email;
-      o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
-      sel.appendChild(o);
-    });
+    renderAssigneeCheckboxes('f-assignee-list', []);
   }
 
   // ── EDIT MODAL ─────────────────────────────────────────────────────────────
@@ -943,14 +987,7 @@
     document.getElementById('e-file-chosen').classList.add('hidden');
     document.getElementById('e-file-chosen').textContent = '';
 
-    var sel = document.getElementById('e-assignee');
-    sel.innerHTML = '';
-    teamMembers.forEach(function(m) {
-      var o = document.createElement('option'); o.value = m.email;
-      o.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
-      if (m.email === task.assignee) o.selected = true;
-      sel.appendChild(o);
-    });
+    renderAssigneeCheckboxes('e-assignee-list', taskAssignees(task));
 
     _editDriveUrl = task.driveUrl || '';
     _editDriveName = '';
@@ -1053,7 +1090,8 @@
     (docData.body.content||[]).forEach(function(el){ if(el.endIndex) endIndex = Math.max(endIndex, el.endIndex); });
     var requests = [];
     if (endIndex > 1) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex - 1 } } });
-    var text = company+'\n\nAssegnatario: '+assignee+'\nData assegnazione: '+fmt(assignDate)+'\nDeadline: '+fmt(deadline)+'\n\nBrief:\n'+(brief||'—');
+    var assigneeNamesStr = assignee.split(',').map(function(e){ return nameOf(e.trim()); }).filter(Boolean).join(', ');
+    var text = company+'\n\nAssegnatari: '+assigneeNamesStr+'\nData assegnazione: '+fmt(assignDate)+'\nDeadline: '+fmt(deadline)+'\n\nBrief:\n'+(brief||'—');
     requests.push({ insertText: { location: { index: 1 }, text: text } });
     await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method: 'POST', body: { requests: requests } });
   }
@@ -1064,14 +1102,15 @@
     btn.disabled = true; btn.textContent = 'Salvo…';
     try {
       var company    = document.getElementById('e-company').value.trim();
-      var assignee   = document.getElementById('e-assignee').value;
+      var assigneeArr = getCheckedAssignees('e-assignee-list');
+      var assignee   = assigneeArr.join(', ');
       var assignDate = document.getElementById('e-assign-date').value;
       var deadline   = document.getElementById('e-deadline').value;
       var status     = document.getElementById('e-status').value;
       var brief      = document.getElementById('e-brief').value.trim();
       var fileInput  = document.getElementById('e-file');
 
-      if (!company || !assignee || !assignDate || !deadline) { showToast('Compila tutti i campi obbligatori','error'); btn.disabled=false; btn.textContent='Salva'; return; }
+      if (!company || !assigneeArr.length || !assignDate || !deadline) { showToast('Compila tutti i campi obbligatori (almeno un assegnatario)','error'); btn.disabled=false; btn.textContent='Salva'; return; }
       if (deadline < assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); btn.disabled=false; btn.textContent='Salva'; return; }
 
       var driveUrl = _editDriveUrl || '';
@@ -1102,7 +1141,7 @@
       btn.textContent = 'Aggiorno calendar…';
       var COLOR_PAIRS = { 'Da fare':{'assign':'11','deadline':'11'}, 'In lavoro':{'assign':'5','deadline':'11'}, 'Completato':{'assign':'8','deadline':'10'} };
       var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
-      var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(_editTask.docUrl?'\n\nDoc:\n'+_editTask.docUrl:'');
+      var desc = 'Assegnatari: '+assigneeArr.map(nameOf).join(', ')+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(_editTask.docUrl?'\n\nDoc:\n'+_editTask.docUrl:'');
       if (_editTask.assignEventId) {
         try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }); }
         catch(e) { console.warn('Assign event patch skipped:', e.message); }
@@ -1125,15 +1164,17 @@
   // ── TASK CREATION ────────────────────────────────────────────────────────────
 
   async function createTask(data) {
-    var company=data.company, assignee=data.assignee, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
+    var company=data.company, assignees=data.assignees, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
+    var assigneeStr = assignees.join(', ');
+    var namesStr = assignees.map(nameOf).join(', ');
     var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] } });
     var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
     await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
-    var desc='Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
+    var desc='Assegnatari: '+namesStr+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
     var aEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11' } });
     var dEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11' } });
     var taskId=Date.now().toString();
-    await sheetsAppend('Tasks!A:L', [[taskId,company,assignee,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare',aEv.id,dEv.id,new Date().toISOString()]]);
+    await sheetsAppend('Tasks!A:L', [[taskId,company,assigneeStr,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare',aEv.id,dEv.id,new Date().toISOString()]]);
     return taskId;
   }
 
@@ -1170,7 +1211,7 @@
     localStorage.setItem(key, Date.now().toString());
     if (!lastSeen) return; // first-ever login: skip greeting
     var mine = tasks.filter(function(t) {
-      return t.assignee && t.assignee.toLowerCase() === userEmail.toLowerCase() && parseInt(t.id) > lastSeen;
+      return isAssignedTo(t, userEmail) && parseInt(t.id) > lastSeen;
     });
     if (!mine.length) return;
     var firstName = (userName || userEmail.split('@')[0]).split(' ')[0];
@@ -1207,13 +1248,13 @@
   var selectedFolderId='', selectedFiles=[];
   async function handleSubmit(e) {
     e.preventDefault();
-    var company=document.getElementById('f-company').value.trim(), assignee=document.getElementById('f-assignee').value, assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
-    if (!company||!assignee||!assignDate||!deadline||!brief) { showToast('Compila tutti i campi obbligatori','error'); return; }
+    var company=document.getElementById('f-company').value.trim(), assignees=getCheckedAssignees('f-assignee-list'), assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
+    if (!company||!assignees.length||!assignDate||!deadline||!brief) { showToast('Compila tutti i campi obbligatori (almeno un assegnatario)','error'); return; }
     if (deadline<assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); return; }
     var btn=document.getElementById('submit-btn'); btn.disabled=true;
     if (selectedFiles.length>0&&selectedFolderId) { btn.textContent='Caricamento file...'; try { await uploadAllFiles(selectedFolderId); } catch(err) { btn.disabled=false; resetSubmitBtn(); return; } }
     btn.textContent='Creazione...';
-    try { await createTask({ company,assignee,assignDate,deadline,brief,driveUrl }); showToast('✓ Task creato! Sheet e Calendar aggiornati','success'); resetForm(); }
+    try { await createTask({ company,assignees,assignDate,deadline,brief,driveUrl }); showToast('✓ Task creato! Sheet e Calendar aggiornati','success'); resetForm(); }
     catch(err) { showToast('Errore: '+err.message,'error'); }
     btn.disabled=false; resetSubmitBtn();
   }
@@ -1350,7 +1391,7 @@
     c.innerHTML = '<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task team...</div></div>';
     try {
       var all = await getAllTasks();
-      var team = all.filter(function(t){ return t.assignee && t.assignee.toLowerCase() !== userEmail.toLowerCase(); });
+      var team = all.filter(function(t){ return !isAssignedTo(t, userEmail); });
       c.innerHTML = '';
       if (!team.length) {
         c.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task nel team</div></div>';
@@ -1363,6 +1404,7 @@
   }
 
   var _overviewFilter = 'all';
+  var _overviewGroup = 'stato';
   var _overviewData = null;
 
   async function loadOverview() {
@@ -1392,56 +1434,95 @@
     }
   }
 
+  function ovRow(t, showAssignee) {
+    var key = SK[t.status] || 'todo';
+    var dDays = days(t.deadline);
+    var isOverdue = dDays !== null && dDays < 0;
+    var dlMsg = fmt(t.deadline);
+    if (dDays !== null) { if (dDays < 0) dlMsg += ' · in ritardo'; else if (dDays === 0) dlMsg += ' · oggi'; else if (dDays === 1) dlMsg += ' · domani'; else if (dDays <= 7) dlMsg += ' · tra '+dDays+'g'; }
+    var row = document.createElement('div');
+    row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
+    var meta = showAssignee ? esc(assigneeNames(t)) + ' · ' + esc(dlMsg) : esc(dlMsg);
+    row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+meta+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
+    return row;
+  }
+  function ovGroupHeader(label, count) {
+    var h = document.createElement('div'); h.className = 'ov-group-hd';
+    h.innerHTML = esc(label) + ' <span class="ov-group-count">'+count+'</span>';
+    return h;
+  }
+
   function renderOverview() {
     if (!_overviewData) return;
     var d = _overviewData;
-    var statsEl = document.getElementById('overview-stats');
-    var listEl  = document.getElementById('overview-tasks');
-    var titleEl = document.getElementById('overview-list-title');
+    var statsEl  = document.getElementById('overview-stats');
+    var listEl   = document.getElementById('overview-tasks');
+    var toggleEl = document.getElementById('overview-grouptoggle');
 
     var cards = [
-      { key: 'all',     lbl: 'Totale aperti', val: d.open.length,    cls: '',       clickable: true  },
-      { key: 'todo',    lbl: 'Da fare',       val: d.todo.length,    cls: 'todo',   clickable: true  },
-      { key: 'prog',    lbl: 'In lavoro',     val: d.prog.length,    cls: 'prog',   clickable: true  },
-      { key: 'overdue', lbl: 'In ritardo',    val: d.overdue.length, cls: 'urgent', clickable: true  }
+      { key: 'all',     lbl: 'Totale aperti', val: d.open.length,    cls: ''       },
+      { key: 'todo',    lbl: 'Da fare',       val: d.todo.length,    cls: 'todo'   },
+      { key: 'prog',    lbl: 'In lavoro',     val: d.prog.length,    cls: 'prog'   },
+      { key: 'overdue', lbl: 'In ritardo',    val: d.overdue.length, cls: 'urgent' }
     ];
     statsEl.innerHTML = cards.map(function(c) {
-      var classes = 'stat-card ' + c.cls
-        + (c.clickable ? ' clickable' : '')
-        + (c.clickable && _overviewFilter === c.key ? ' active' : '');
-      var attr = c.clickable ? ' onclick="setOverviewFilter(\''+c.key+'\')"' : '';
-      return '<div class="'+classes.trim()+'"'+attr+'><div class="stat-num">'+c.val+'</div><div class="stat-lbl">'+esc(c.lbl)+'</div></div>';
+      var classes = ('stat-card ' + c.cls + ' clickable' + (_overviewFilter === c.key ? ' active' : '')).trim();
+      return '<div class="'+classes+'" onclick="setOverviewFilter(\''+c.key+'\')"><div class="stat-num">'+c.val+'</div><div class="stat-lbl">'+esc(c.lbl)+'</div></div>';
     }).join('');
-
-    var titles = { all: 'Task aperti', todo: 'Da fare', prog: 'In lavoro', overdue: 'In ritardo' };
-    titleEl.textContent = titles[_overviewFilter] || 'Task aperti';
 
     var list = _overviewFilter === 'todo' ? d.todo
              : _overviewFilter === 'prog' ? d.prog
              : _overviewFilter === 'overdue' ? d.overdue
              : d.open;
 
+    // Group toggle — manager only
+    if (userRole === 'manager') {
+      toggleEl.classList.remove('hidden');
+      toggleEl.innerHTML =
+        '<button class="grp-btn'+(_overviewGroup==='stato'?' active':'')+'" onclick="setOverviewGroup(\'stato\')">Per stato</button>' +
+        '<button class="grp-btn'+(_overviewGroup==='persona'?' active':'')+'" onclick="setOverviewGroup(\'persona\')">Per persona</button>';
+    } else {
+      toggleEl.classList.add('hidden');
+    }
+
+    listEl.innerHTML = '';
     if (!list.length) {
       listEl.innerHTML = '<div class="ov-empty">🎉 Nessun task in questa categoria</div>';
       return;
     }
-    listEl.innerHTML = '';
-    list.forEach(function(t) {
-      var key = SK[t.status] || 'todo';
-      var dDays = days(t.deadline);
-      var isOverdue = dDays !== null && dDays < 0;
-      var dlMsg = fmt(t.deadline);
-      if (dDays !== null) { if (dDays < 0) dlMsg += ' · in ritardo'; else if (dDays === 0) dlMsg += ' · oggi'; else if (dDays === 1) dlMsg += ' · domani'; else if (dDays <= 7) dlMsg += ' · tra '+dDays+'g'; }
-      var row = document.createElement('div');
-      row.className = 'ov-row' + (isOverdue ? ' overdue' : '');
-      var meta = userRole === 'manager' ? esc(t.assignee) + ' · ' + esc(dlMsg) : esc(dlMsg);
-      row.innerHTML = '<div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div><div class="ov-row-meta">'+meta+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span>';
-      listEl.appendChild(row);
-    });
+
+    if (userRole !== 'manager') {
+      list.forEach(function(t){ listEl.appendChild(ovRow(t, false)); });
+      return;
+    }
+
+    if (_overviewGroup === 'persona') {
+      var pg = {};
+      list.forEach(function(t) {
+        var as = taskAssignees(t);
+        if (!as.length) { (pg['— Non assegnato'] = pg['— Non assegnato'] || []).push(t); return; }
+        as.forEach(function(em) { var nm = nameOf(em); (pg[nm] = pg[nm] || []).push(t); });
+      });
+      Object.keys(pg).sort().forEach(function(nm) {
+        listEl.appendChild(ovGroupHeader(nm, pg[nm].length));
+        pg[nm].forEach(function(t){ listEl.appendChild(ovRow(t, false)); });
+      });
+    } else {
+      ['Da fare','In lavoro'].forEach(function(st) {
+        var sub = list.filter(function(t){ return t.status === st; });
+        if (!sub.length) return;
+        listEl.appendChild(ovGroupHeader(st, sub.length));
+        sub.forEach(function(t){ listEl.appendChild(ovRow(t, true)); });
+      });
+    }
   }
 
   function setOverviewFilter(f) {
     _overviewFilter = (_overviewFilter === f) ? 'all' : f;
+    renderOverview();
+  }
+  function setOverviewGroup(g) {
+    _overviewGroup = g;
     renderOverview();
   }
 
@@ -1457,7 +1538,7 @@
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
     var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div style="display:flex;align-items:center;gap:6px;">'+pencilBtn+'<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatario: '+esc(task.assignee)+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div style="display:flex;align-items:center;gap:6px;">'+pencilBtn+'<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
@@ -1527,6 +1608,11 @@
     renderCalDay();
   }
 
+  function calRowHtml(t) {
+    var key = SK[t.status] || 'todo';
+    return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
+  }
+
   function renderCalDay() {
     var detail = document.getElementById('cal-detail');
     if (!_calSelectedDay) {
@@ -1534,14 +1620,23 @@
       return;
     }
     var tasks = _calTasks.filter(function(t){ return t.deadline === _calSelectedDay; });
-    var title = '<div class="section-hd" style="margin-top:22px">Scadenze · ' + esc(fmt(_calSelectedDay)) + '</div>';
-    if (!tasks.length) { detail.innerHTML = title + '<div class="ov-empty">Nessun task in scadenza</div>'; return; }
-    var rows = tasks.map(function(t) {
-      var key = SK[t.status] || 'todo';
-      var meta = userRole === 'manager' ? '<div class="ov-row-meta">'+esc(t.assignee)+'</div>' : '';
-      return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div>'+meta+'</div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
-    }).join('');
-    detail.innerHTML = title + rows;
+    var html = '<div class="section-hd" style="margin-top:22px">Scadenze · ' + esc(fmt(_calSelectedDay)) + '</div>';
+    if (!tasks.length) { detail.innerHTML = html + '<div class="ov-empty">Nessun task in scadenza</div>'; return; }
+    if (userRole === 'manager') {
+      var pg = {};
+      tasks.forEach(function(t) {
+        var as = taskAssignees(t);
+        if (!as.length) { (pg['— Non assegnato'] = pg['— Non assegnato'] || []).push(t); return; }
+        as.forEach(function(em) { var nm = nameOf(em); (pg[nm] = pg[nm] || []).push(t); });
+      });
+      Object.keys(pg).sort().forEach(function(nm) {
+        html += '<div class="ov-group-hd">'+esc(nm)+' <span class="ov-group-count">'+pg[nm].length+'</span></div>';
+        html += pg[nm].map(calRowHtml).join('');
+      });
+    } else {
+      html += tasks.map(calRowHtml).join('');
+    }
+    detail.innerHTML = html;
   }
 
   // Auto-refresh data every 5 minutes when visible

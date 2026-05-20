@@ -168,11 +168,33 @@ function getTeam_() {
   return team;
 }
 
+function emailInCsv_(csv, email) {
+  if (!csv) return false;
+  var target = email.toLowerCase();
+  var list = csv.toString().toLowerCase().split(',');
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].trim() === target) return true;
+  }
+  return false;
+}
+
+function namesForCsv_(csv) {
+  if (!csv) return '';
+  var rows = getSheet_('Team').getDataRange().getValues(), map = {};
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1]) map[rows[i][1].toString().trim().toLowerCase()] = rows[i][0].toString().trim();
+  }
+  return csv.toString().split(',').map(function(e) {
+    var k = e.trim().toLowerCase();
+    return map[k] || e.trim();
+  }).join(', ');
+}
+
 function getTasksForUser_(email) {
   var rows = getSheet_('Tasks').getDataRange().getValues(), tasks = [];
   for (var i = 1; i < rows.length; i++) {
     if (!rows[i][2]) continue;
-    if (rows[i][2].toString().trim().toLowerCase() !== email.toLowerCase()) continue;
+    if (!emailInCsv_(rows[i][2], email)) continue;
     tasks.push(rowToTask_(rows[i]));
   }
   return tasks.sort(function(a,b){ return a.deadline < b.deadline ? -1 : 1; });
@@ -196,7 +218,7 @@ function updateStatus_(taskId, newStatus, callerEmail) {
   var role = getUserRole_(callerEmail);
   for (var i = 1; i < rows.length; i++) {
     if (!rows[i][0] || rows[i][0].toString() !== taskId.toString()) continue;
-    if (role !== 'manager' && rows[i][2].toString().trim().toLowerCase() !== callerEmail.toLowerCase())
+    if (role !== 'manager' && !emailInCsv_(rows[i][2], callerEmail))
       throw new Error('Non autorizzato');
     sheet.getRange(i + 1, 9).setValue(newStatus);
     var colors = COLOR_MAP[newStatus];
@@ -252,7 +274,7 @@ function tryDeleteEvent_(eventId) {
 
 function syncEventsForRow_(company, assignee, assignDate, deadline, brief, driveUrl, docUrl, status, assignEventId, deadlineEventId) {
   var colors = COLOR_MAP[status] || COLOR_MAP['Da fare'];
-  var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(docUrl?'\n\nDoc:\n'+docUrl:'');
+  var desc = 'Assegnatari: '+namesForCsv_(assignee)+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(docUrl?'\n\nDoc:\n'+docUrl:'');
   if (assignEventId) {
     try {
       Calendar.Events.patch({
@@ -305,7 +327,7 @@ function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, 
   var body = doc.getBody();
   body.clear();
   body.appendParagraph(company).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph('Assegnatario: ' + assignee);
+  body.appendParagraph('Assegnatari: ' + namesForCsv_(assignee));
   body.appendParagraph('Data assegnazione: ' + assignDate);
   body.appendParagraph('Deadline: ' + deadline);
   body.appendParagraph('');
@@ -330,11 +352,12 @@ function setupSheetValidation_() {
   taskSheet.getRange(2, 9, extraRows, 1).setDataValidation(statusRule);
 
   // Assignee dropdown from Team!B column — col C (3)
+  // allowInvalid(true): the cell can hold multiple comma-separated emails
   var teamLast = Math.max(teamSheet.getLastRow(), 2);
   var emailRange = teamSheet.getRange('B2:B' + teamLast);
   var emailRule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(emailRange, true)
-    .setAllowInvalid(false)
+    .setAllowInvalid(true)
     .build();
   taskSheet.getRange(2, 3, extraRows, 1).setDataValidation(emailRule);
 
