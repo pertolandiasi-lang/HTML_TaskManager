@@ -335,7 +335,7 @@
     #assignee-modal { z-index: 1002; }
 
     /* ── IN-APP CALENDAR ────────────────────────────────── */
-    .cal-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .cal-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 22px; }
     .cal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .cal-title { font-size: 16px; font-weight: 700; color: var(--text); }
     .cal-nav { background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; width: 36px; height: 36px; cursor: pointer; color: var(--text); font-size: 18px; display: flex; align-items: center; justify-content: center; font-family: inherit; }
@@ -357,11 +357,13 @@
     .cal-hint { padding: 26px 16px; text-align: center; color: var(--text-3); font-size: 13px; }
     .cal-legend { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
     .cal-leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
-    .cal-dayblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .cal-dayblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
     .cal-dayblock.today { border-color: var(--primary-light); }
-    .cal-dayblock-hd { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
-    .cal-dayblock .ov-group-hd:first-of-type { margin-top: 8px; }
-    .cal-day-empty { font-size: 13px; color: var(--text-3); padding: 6px 0 2px; }
+    .cal-dayblock-hd { font-size: 15px; font-weight: 700; color: var(--text); padding: 12px 16px; background: var(--card-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .cal-dayblock.today .cal-dayblock-hd { color: var(--primary-light); }
+    .cal-dayblock-body { padding: 12px 16px; }
+    .cal-dayblock-body > .ov-group-hd:first-child { margin-top: 2px; }
+    .cal-day-empty { font-size: 13px; color: var(--text-3); padding: 4px 0; }
 
     /* ── EDIT MODAL ─────────────────────────────────────── */
     .edit-modal-box { max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -1780,9 +1782,9 @@
     var label = CAL_DOW_FULL[(d.getDay()+6)%7] + ' ' + d.getDate() + ' ' + CAL_MON_SHORT[d.getMonth()];
     var tasks = _calTasks.filter(function(t){ return t.deadline === dateStr; });
     var cls = 'cal-dayblock' + (dateStr === calStr(new Date()) ? ' today' : '');
-    var html = '<div class="'+cls+'"><div class="cal-dayblock-hd">'+esc(label)+' <span class="ov-group-count">'+tasks.length+'</span></div>';
-    html += tasks.length ? calTasksHtml(tasks) : '<div class="cal-day-empty">Nessuna scadenza</div>';
-    return html + '</div>';
+    var body = tasks.length ? calTasksHtml(tasks) : '<div class="cal-day-empty">Nessuna scadenza</div>';
+    return '<div class="'+cls+'"><div class="cal-dayblock-hd">'+esc(label)+' <span class="ov-group-count">'+tasks.length+'</span></div>'
+      + '<div class="cal-dayblock-body">'+body+'</div></div>';
   }
 
   function renderCalMonth() {
