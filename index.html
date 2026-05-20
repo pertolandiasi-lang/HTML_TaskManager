@@ -205,7 +205,7 @@
 
     /* ── DRIVE MODAL ─────────────────────────────────────────── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; animation: modalPop .24s cubic-bezier(.16,1,.3,1); }
+    .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; animation: modalPop .24s cubic-bezier(.16,1,.3,1); }
     @keyframes modalPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     #task-detail-body { background: var(--bg); }
     .modal-hd { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
