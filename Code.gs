@@ -46,6 +46,11 @@ function authorize() {
 // ── ROUTER ────────────────────────────────────────────────────────────────────
 
 function dispatch_(p) {
+  // Called by the Sheet-bound script after a multi-assign — re-syncs one row.
+  if (p.action === 'syncRow' && p.key === 'tf_syncrow_v56') {
+    syncTaskRow_(parseInt(p.row, 10));
+    return respond_({ ok: true });
+  }
   if (!p.token) throw new Error('Token mancante');
   var callerEmail = verifyToken_(p.token);
 
@@ -384,94 +389,30 @@ function createInstallableTrigger() {
     if (fn === 'onTaskSheetEdit' || fn === 'onTaskSheetOpen') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('onTaskSheetEdit').forSpreadsheet(ss).onEdit().create();
-  ScriptApp.newTrigger('onTaskSheetOpen').forSpreadsheet(ss).onOpen().create();
-  Logger.log('Trigger installati (onEdit + onOpen)!');
+  Logger.log('Trigger installato (onEdit)!');
 }
 
-// ── ASSIGNEE MENU + DIALOG (multi-select from the Sheet) ──────────────────────
+// Deprecated no-op — kept so any stale onOpen trigger doesn't error.
+function onTaskSheetOpen() {}
 
-function onTaskSheetOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('👥 Assegnatari')
-    .addItem('Assegna persone alla riga selezionata', 'showAssigneeDialog')
-    .addToUi();
-}
+// ── ROW SYNC (called by the Sheet-bound script after a multi-assign) ──────────
 
-function escapeHtml_(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function showAssigneeDialog() {
-  var ui = SpreadsheetApp.getUi();
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (sheet.getName() !== 'Tasks') {
-    ui.alert('Apri il foglio "Tasks" e seleziona una riga di task.');
-    return;
-  }
-  var row = sheet.getActiveRange().getRow();
-  if (row < 2) {
-    ui.alert('Seleziona una riga di task (non l\'intestazione).');
-    return;
-  }
-  var taskName = String(sheet.getRange(row, 2).getValue() || ('Riga ' + row));
-  var current = String(sheet.getRange(row, 3).getValue() || '');
-  var currentList = current.toLowerCase().split(',').map(function(s){ return s.trim(); });
-  var team = getTeam_();
-
-  var checkboxes = team.map(function(m) {
-    var checked = currentList.indexOf(m.email.toLowerCase()) >= 0 ? ' checked' : '';
-    return '<label><input type="checkbox" value="'+escapeHtml_(m.email)+'"'+checked+'>'
-      + '<span>'+escapeHtml_(m.name)+(m.role==='manager'?' <em>(manager)</em>':'')+'</span></label>';
-  }).join('');
-
-  var html = '<!DOCTYPE html><html><head><base target="_top"><style>'
-    + 'body{font-family:-apple-system,Roboto,Arial,sans-serif;margin:0;padding:16px;color:#202124;}'
-    + '.hd{font-size:12px;color:#5f6368;}'
-    + '.tn{font-size:16px;font-weight:600;margin:2px 0 14px;}'
-    + '.list{max-height:300px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:10px;padding:4px;}'
-    + 'label{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer;font-size:14px;}'
-    + 'label:hover{background:#f1f1f4;}'
-    + 'label em{color:#5f6368;font-style:italic;}'
-    + 'input[type=checkbox]{width:17px;height:17px;accent-color:#5e17eb;}'
-    + '.row{display:flex;gap:8px;margin-top:14px;}'
-    + 'button{flex:1;padding:10px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}'
-    + '.save{background:#5e17eb;color:#fff;}.cancel{background:#f1f1f4;color:#202124;}'
-    + 'button:disabled{opacity:.6;}'
-    + '</style></head><body>'
-    + '<div class="hd">Assegna persone a:</div>'
-    + '<div class="tn">'+escapeHtml_(taskName)+'</div>'
-    + '<div class="list">'+(checkboxes || '<div style="padding:12px;color:#5f6368;">Nessun membro nel team</div>')+'</div>'
-    + '<div class="row"><button class="cancel" onclick="google.script.host.close()">Annulla</button>'
-    + '<button class="save" onclick="save()">Salva</button></div>'
-    + '<script>function save(){'
-    + 'var c=document.querySelectorAll("input[type=checkbox]:checked"),e=[];'
-    + 'for(var i=0;i<c.length;i++)e.push(c[i].value);'
-    + 'var b=document.querySelector(".save");b.textContent="Salvataggio…";b.disabled=true;'
-    + 'google.script.run.withSuccessHandler(function(){google.script.host.close();})'
-    + '.withFailureHandler(function(err){b.textContent="Salva";b.disabled=false;alert("Errore: "+err.message);})'
-    + '.setRowAssignees('+row+',e.join(", "));}<\/script>'
-    + '</body></html>';
-
-  var output = HtmlService.createHtmlOutput(html).setWidth(340).setHeight(440);
-  ui.showModalDialog(output, 'Assegnatari');
-}
-
-function setRowAssignees(row, csv) {
+function syncTaskRow_(row) {
+  if (!row || row < 2) return;
   var sheet = getSheet_('Tasks');
-  sheet.getRange(row, 3).setValue(csv);
   var r = sheet.getRange(row, 1, 1, 11).getValues()[0];
   if (!r[0]) return;
-  var company = String(r[1]||''), assignDate = formatDate_(r[3]), deadline = formatDate_(r[4]);
+  var company = String(r[1]||''), assignee = String(r[2]||'');
+  var assignDate = formatDate_(r[3]), deadline = formatDate_(r[4]);
   var brief = String(r[5]||''), driveUrl = String(r[6]||''), docUrl = String(r[7]||'');
   var status = String(r[8]||'Da fare');
   if (assignDate && deadline) {
-    syncEventsForRow_(company, csv, assignDate, deadline, brief, driveUrl, docUrl, status,
+    syncEventsForRow_(company, assignee, assignDate, deadline, brief, driveUrl, docUrl, status,
       String(r[9]||''), String(r[10]||''));
   }
   if (docUrl) {
-    try { updateDocBody_(docUrl, company, csv, assignDate, deadline, brief, driveUrl); }
-    catch(e) { Logger.log('setRowAssignees doc err: ' + e.message); }
+    try { updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, driveUrl); }
+    catch(e) { Logger.log('syncTaskRow_ doc err: ' + e.message); }
   }
 }
 
