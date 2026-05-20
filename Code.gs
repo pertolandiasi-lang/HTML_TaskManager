@@ -253,7 +253,6 @@ function tryDeleteEvent_(eventId) {
 function syncEventsForRow_(company, assignee, assignDate, deadline, brief, driveUrl, docUrl, status, assignEventId, deadlineEventId) {
   var colors = COLOR_MAP[status] || COLOR_MAP['Da fare'];
   var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(docUrl?'\n\nDoc:\n'+docUrl:'');
-  var attendees = assignee ? [{ email: assignee }] : [];
   if (assignEventId) {
     try {
       Calendar.Events.patch({
@@ -261,9 +260,8 @@ function syncEventsForRow_(company, assignee, assignDate, deadline, brief, drive
         start: { date: assignDate },
         end: { date: addOneDay_(assignDate) },
         description: desc,
-        colorId: colors.assign,
-        attendees: attendees
-      }, CALENDAR_ID, assignEventId, { sendUpdates: 'all' });
+        colorId: colors.assign
+      }, CALENDAR_ID, assignEventId);
     } catch(e) { Logger.log('Sync assign event err: '+e.message); }
   }
   if (deadlineEventId) {
@@ -273,28 +271,25 @@ function syncEventsForRow_(company, assignee, assignDate, deadline, brief, drive
         start: { date: deadline },
         end: { date: addOneDay_(deadline) },
         description: desc,
-        colorId: colors.deadline,
-        attendees: attendees
-      }, CALENDAR_ID, deadlineEventId, { sendUpdates: 'all' });
+        colorId: colors.deadline
+      }, CALENDAR_ID, deadlineEventId);
     } catch(e) { Logger.log('Sync deadline event err: '+e.message); }
   }
 }
 
-function addAttendeesToAllEvents_() {
+function removeAttendeesFromAllEvents_() {
   var rows = getSheet_('Tasks').getDataRange().getValues();
   var n = 0;
   for (var i = 1; i < rows.length; i++) {
     if (!rows[i][0]) continue;
-    var assignee = String(rows[i][2] || '').trim();
-    if (!assignee) continue;
     var aId = String(rows[i][9] || ''), dId = String(rows[i][10] || '');
     if (aId) {
-      try { Calendar.Events.patch({ attendees: [{ email: assignee }] }, CALENDAR_ID, aId, { sendUpdates: 'all' }); }
-      catch(e) { Logger.log('backfill assign err: '+e.message); }
+      try { Calendar.Events.patch({ attendees: [] }, CALENDAR_ID, aId, { sendUpdates: 'all' }); }
+      catch(e) { Logger.log('rm attendee assign err: '+e.message); }
     }
     if (dId) {
-      try { Calendar.Events.patch({ attendees: [{ email: assignee }] }, CALENDAR_ID, dId, { sendUpdates: 'all' }); }
-      catch(e) { Logger.log('backfill deadline err: '+e.message); }
+      try { Calendar.Events.patch({ attendees: [] }, CALENDAR_ID, dId, { sendUpdates: 'all' }); }
+      catch(e) { Logger.log('rm attendee deadline err: '+e.message); }
     }
     n++;
   }

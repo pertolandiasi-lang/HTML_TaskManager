@@ -305,6 +305,30 @@
     .ov-row .status-pill { flex-shrink: 0; }
     .ov-empty { padding: 32px 20px; text-align: center; color: var(--text-2); background: var(--card); border: 1px dashed var(--border); border-radius: 14px; }
 
+    /* ── IN-APP CALENDAR ────────────────────────────────── */
+    .cal-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .cal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cal-title { font-size: 16px; font-weight: 700; color: var(--text); }
+    .cal-nav { background: var(--card-2); border: 1px solid var(--border); border-radius: 9px; width: 36px; height: 36px; cursor: pointer; color: var(--text); font-size: 18px; display: flex; align-items: center; justify-content: center; font-family: inherit; }
+    .cal-nav:hover { background: var(--bg-2); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-dow { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-3); padding: 4px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+    .cal-cell { min-height: 52px; border-radius: 9px; padding: 5px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; border: 1px solid transparent; background: var(--bg-2); }
+    .cal-cell.empty { background: transparent; cursor: default; }
+    .cal-cell:not(.empty):hover { border-color: var(--border); }
+    .cal-cell.today { border-color: var(--primary); }
+    .cal-cell.selected { background: var(--card-2); border-color: var(--text-2); }
+    .cal-daynum { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .cal-cell.today .cal-daynum { color: var(--primary); }
+    .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; }
+    .cal-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .cal-dot.cd-todo { background: var(--status-todo); }
+    .cal-dot.cd-prog { background: var(--status-prog); }
+    .cal-dot.cd-done { background: var(--status-done); }
+    .cal-hint { padding: 26px 16px; text-align: center; color: var(--text-3); font-size: 13px; }
+    .cal-legend { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+    .cal-leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
+
     /* ── EDIT MODAL ─────────────────────────────────────── */
     .edit-modal-box { max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
     .modal-body { flex: 1; overflow-y: auto; padding: 20px; }
@@ -443,6 +467,9 @@
           <button class="role-tab" id="tab-team" onclick="switchView('team')">
             <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team
           </button>
+          <button class="role-tab" id="tab-calendar" onclick="switchView('calendar')">
+            <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario
+          </button>
           <button class="role-tab" id="tab-overview" onclick="switchView('overview')">
             <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Overview
           </button>
@@ -507,6 +534,24 @@
     <div id="view-team" class="hidden">
       <div class="emp-hd"><div><h2 class="emp-title">Team</h2><p class="emp-sub">Task assegnati al resto del team</p></div></div>
       <div id="team-sections"></div>
+    </div>
+
+    <div id="view-calendar" class="hidden">
+      <div class="emp-hd"><div><h2 class="emp-title">Calendario</h2><p class="emp-sub">Task per data di scadenza</p></div></div>
+      <div class="cal-wrap">
+        <div class="cal-hd">
+          <button class="cal-nav" onclick="calShiftMonth(-1)">‹</button>
+          <div class="cal-title" id="cal-title">—</div>
+          <button class="cal-nav" onclick="calShiftMonth(1)">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <div class="cal-legend">
+          <span class="cal-leg"><span class="cal-dot cd-todo"></span>Da fare</span>
+          <span class="cal-leg"><span class="cal-dot cd-prog"></span>In lavoro</span>
+          <span class="cal-leg"><span class="cal-dot cd-done"></span>Completato</span>
+        </div>
+      </div>
+      <div id="cal-detail"></div>
     </div>
 
     <div id="view-overview" class="hidden">
@@ -1055,11 +1100,11 @@
       var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
       var desc = 'Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(_editTask.docUrl?'\n\nDoc:\n'+_editTask.docUrl:'');
       if (_editTask.assignEventId) {
-        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.assignEventId+'?sendUpdates=all', { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign, attendees:[{email:assignee}] } }); }
+        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }); }
         catch(e) { console.warn('Assign event patch skipped:', e.message); }
       }
       if (_editTask.deadlineEventId) {
-        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.deadlineEventId+'?sendUpdates=all', { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline, attendees:[{email:assignee}] } }); }
+        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.deadlineEventId, { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline } }); }
         catch(e) { console.warn('Deadline event patch skipped:', e.message); }
       }
 
@@ -1081,8 +1126,8 @@
     var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
     await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
     var desc='Assegnatario: '+assignee+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
-    var aEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11', attendees:[{email:assignee}] } });
-    var dEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11', attendees:[{email:assignee}] } });
+    var aEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11' } });
+    var dEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11' } });
     var taskId=Date.now().toString();
     await sheetsAppend('Tasks!A:L', [[taskId,company,assignee,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare',aEv.id,dEv.id,new Date().toISOString()]]);
     return taskId;
@@ -1133,7 +1178,7 @@
   var _currentView = 'manager';
   function switchView(v) {
     _currentView = v;
-    var views = ['manager','employee','team','overview'];
+    var views = ['manager','employee','team','calendar','overview'];
     views.forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
@@ -1142,6 +1187,7 @@
     });
     if (v === 'employee') loadMyTasks();
     if (v === 'team') loadTeamTasks();
+    if (v === 'calendar') loadCalendar();
     if (v === 'overview') loadOverview();
   }
 
@@ -1415,7 +1461,83 @@
     if (!accessToken) return;
     if (_currentView === 'employee') loadMyTasks();
     else if (_currentView === 'team') loadTeamTasks();
+    else if (_currentView === 'calendar') loadCalendar();
     else if (_currentView === 'overview') loadOverview();
+  }
+
+  // ── IN-APP CALENDAR ───────────────────────────────────────────────────────
+  var _calMonth = new Date(), _calSelectedDay = null, _calTasks = [];
+  var CAL_MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+  async function loadCalendar() {
+    try {
+      _calTasks = userRole === 'manager' ? await getAllTasks() : await getMyTasks();
+      renderCalendar();
+    } catch(e) {
+      document.getElementById('cal-grid').innerHTML = '<div class="ov-empty" style="grid-column:1/-1">⚠️ '+esc(e.message)+'</div>';
+    }
+  }
+
+  function calShiftMonth(delta) {
+    _calMonth = new Date(_calMonth.getFullYear(), _calMonth.getMonth() + delta, 1);
+    _calSelectedDay = null;
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    var year = _calMonth.getFullYear(), month = _calMonth.getMonth();
+    document.getElementById('cal-title').textContent = CAL_MONTHS[month] + ' ' + year;
+
+    var byDay = {};
+    _calTasks.forEach(function(t) {
+      if (!t.deadline) return;
+      (byDay[t.deadline] = byDay[t.deadline] || []).push(t);
+    });
+
+    var first = new Date(year, month, 1);
+    var startDow = (first.getDay() + 6) % 7;
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var todayStr = new Date().toISOString().split('T')[0];
+
+    var grid = document.getElementById('cal-grid');
+    grid.innerHTML = '';
+    ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(function(d) {
+      var el = document.createElement('div'); el.className = 'cal-dow'; el.textContent = d;
+      grid.appendChild(el);
+    });
+    for (var i = 0; i < startDow; i++) {
+      var empty = document.createElement('div'); empty.className = 'cal-cell empty';
+      grid.appendChild(empty);
+    }
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateStr = year + '-' + String(month+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell' + (dateStr === todayStr ? ' today' : '') + (dateStr === _calSelectedDay ? ' selected' : '');
+      var tasks = byDay[dateStr] || [];
+      var dots = tasks.slice(0,6).map(function(t) { return '<span class="cal-dot cd-'+(SK[t.status]||'todo')+'"></span>'; }).join('');
+      cell.innerHTML = '<span class="cal-daynum">'+day+'</span><div class="cal-dots">'+dots+'</div>';
+      cell.dataset.date = dateStr;
+      cell.addEventListener('click', function() { _calSelectedDay = this.dataset.date; renderCalendar(); });
+      grid.appendChild(cell);
+    }
+    renderCalDay();
+  }
+
+  function renderCalDay() {
+    var detail = document.getElementById('cal-detail');
+    if (!_calSelectedDay) {
+      detail.innerHTML = '<div class="cal-hint">Tocca un giorno per vedere i task in scadenza</div>';
+      return;
+    }
+    var tasks = _calTasks.filter(function(t){ return t.deadline === _calSelectedDay; });
+    var title = '<div class="section-hd" style="margin-top:22px">Scadenze · ' + esc(fmt(_calSelectedDay)) + '</div>';
+    if (!tasks.length) { detail.innerHTML = title + '<div class="ov-empty">Nessun task in scadenza</div>'; return; }
+    var rows = tasks.map(function(t) {
+      var key = SK[t.status] || 'todo';
+      var meta = userRole === 'manager' ? '<div class="ov-row-meta">'+esc(t.assignee)+'</div>' : '';
+      return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div>'+meta+'</div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
+    }).join('');
+    detail.innerHTML = title + rows;
   }
 
   // Auto-refresh data every 5 minutes when visible
