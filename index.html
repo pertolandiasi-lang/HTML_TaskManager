@@ -31,7 +31,7 @@
       --primary-light: #ae8bf5;
       --status-todo: #ff6b6b;
       --status-prog: #d4b84a;
-      --status-done: #666688;
+      --status-done: #3fb950;
     }
 
     html, body {
@@ -170,7 +170,7 @@
     .sp-todo     .s-dot { background: var(--status-todo); }
     .sp-progress { color: var(--status-prog); box-shadow: 0 0 0 1px rgba(212,184,74,.25); }
     .sp-progress .s-dot { background: var(--status-prog); }
-    .sp-done     { color: var(--status-done); box-shadow: 0 0 0 1px rgba(102,102,136,.25); }
+    .sp-done     { color: var(--status-done); box-shadow: 0 0 0 1px rgba(63,185,80,.25); }
     .sp-done     .s-dot { background: var(--status-done); }
     .tc-brief { font-size: 13px; color: var(--text-2); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .tc-deadline { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
@@ -179,8 +179,11 @@
     .tc-link { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; color: var(--text-2); background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 7px; text-decoration: none; transition: border-color .15s, color .15s; }
     .tc-link:hover { border-color: rgba(174,139,245,.4); color: var(--primary-light); }
     .tc-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .tc-status-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); }
-    .tc-status-sel { width: 152px; padding: 6px 30px 6px 10px; font-size: 12px; }
+    .tc-status-sel { appearance: none; -webkit-appearance: none; border-radius: 9999px; padding: 8px 34px 8px 15px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; border: 1px solid; outline: none; background-repeat: no-repeat; background-position: right 12px center; }
+    .tc-status-sel.tsel-todo     { color: var(--status-todo); background-color: rgba(255,107,107,.14); border-color: rgba(255,107,107,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff6b6b' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
+    .tc-status-sel.tsel-progress { color: var(--status-prog); background-color: rgba(212,184,74,.14); border-color: rgba(212,184,74,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d4b84a' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
+    .tc-status-sel.tsel-done     { color: var(--status-done); background-color: rgba(63,185,80,.14); border-color: rgba(63,185,80,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%233fb950' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
+    .tc-status-sel option { color: var(--text); background: var(--card-2); font-weight: 600; }
     .btn-delete { background: none; border: 1px solid var(--border); border-radius: 7px; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 5px 10px; transition: border-color .15s, color .15s; }
     .btn-delete:hover { border-color: rgba(255,80,80,.5); color: #ff6060; }
 
@@ -321,11 +324,15 @@
     .grp-btn.active { background: var(--primary); color: var(--primary-fg); }
     .ov-group-hd { font-size: 13px; font-weight: 700; color: var(--text-2); margin: 20px 0 8px; display: flex; align-items: center; gap: 8px; }
     .ov-group-count { font-size: 11px; color: var(--text-3); font-weight: 600; background: var(--card-2); padding: 1px 8px; border-radius: 9999px; }
-    .assignee-list { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: 12px; padding: 6px; max-height: 220px; overflow-y: auto; background: var(--bg-2); }
-    .assignee-opt { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+    .assignee-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: inherit; font-size: 14px; padding: 13px 14px; cursor: pointer; text-align: left; }
+    .assignee-btn:hover { border-color: var(--text-3); }
+    .assignee-btn .ico-sm { color: var(--text-3); }
+    .assignee-btn.empty > span { color: var(--text-3); }
+    .assignee-opt { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px; cursor: pointer; }
     .assignee-opt:hover { background: var(--card-2); }
     .assignee-opt input { width: 17px; height: 17px; accent-color: var(--primary); flex-shrink: 0; }
     .assignee-opt span { font-size: 14px; color: var(--text); }
+    #assignee-modal { z-index: 1002; }
 
     /* ── IN-APP CALENDAR ────────────────────────────────── */
     .cal-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
@@ -345,11 +352,16 @@
     .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; }
     .cal-dot { width: 6px; height: 6px; border-radius: 50%; }
     .cal-dot.cd-todo { background: var(--status-todo); }
-    .cal-dot.cd-prog { background: var(--status-prog); }
+    .cal-dot.cd-progress { background: var(--status-prog); }
     .cal-dot.cd-done { background: var(--status-done); }
     .cal-hint { padding: 26px 16px; text-align: center; color: var(--text-3); font-size: 13px; }
     .cal-legend { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
     .cal-leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); }
+    .cal-dayblock { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .cal-dayblock.today { border-color: var(--primary-light); }
+    .cal-dayblock-hd { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .cal-dayblock .ov-group-hd:first-of-type { margin-top: 8px; }
+    .cal-day-empty { font-size: 13px; color: var(--text-3); padding: 6px 0 2px; }
 
     /* ── EDIT MODAL ─────────────────────────────────────── */
     .edit-modal-box { max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -526,7 +538,7 @@
           <form id="task-form" novalidate>
             <div class="fg">
               <div class="field fg-2"><label for="f-company">Azienda / progetto</label><input type="text" id="f-company" placeholder="es. Lumen Studio" autocomplete="off" required></div>
-              <div class="field fg-2"><label>Assegnatari</label><div class="assignee-list" id="f-assignee-list"></div></div>
+              <div class="field fg-2"><label>Assegnatari</label><button type="button" class="assignee-btn empty" onclick="openAssigneeModal('create')"><span id="f-assignee-summary">Seleziona persone…</span><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button></div>
               <div class="field">
                 <div class="date-row">
                   <div><label for="f-assign-date">Assegnazione</label><input type="date" id="f-assign-date" required></div>
@@ -569,16 +581,21 @@
 
     <div id="view-calendar" class="hidden">
       <div class="emp-hd"><div><h2 class="emp-title">Calendario</h2><p class="emp-sub">Task per data di scadenza</p></div></div>
+      <div class="grp-toggle" id="cal-viewtoggle">
+        <button class="grp-btn active" data-cv="month" onclick="setCalView('month')">Mese</button>
+        <button class="grp-btn" data-cv="week" onclick="setCalView('week')">Settimana</button>
+        <button class="grp-btn" data-cv="day" onclick="setCalView('day')">Giorno</button>
+      </div>
       <div class="cal-wrap">
         <div class="cal-hd">
-          <button class="cal-nav" onclick="calShiftMonth(-1)">‹</button>
+          <button class="cal-nav" onclick="calShift(-1)">‹</button>
           <div class="cal-title" id="cal-title">—</div>
-          <button class="cal-nav" onclick="calShiftMonth(1)">›</button>
+          <button class="cal-nav" onclick="calShift(1)">›</button>
         </div>
         <div class="cal-grid" id="cal-grid"></div>
-        <div class="cal-legend">
+        <div class="cal-legend" id="cal-legend">
           <span class="cal-leg"><span class="cal-dot cd-todo"></span>Da fare</span>
-          <span class="cal-leg"><span class="cal-dot cd-prog"></span>In lavoro</span>
+          <span class="cal-leg"><span class="cal-dot cd-progress"></span>In lavoro</span>
           <span class="cal-leg"><span class="cal-dot cd-done"></span>Completato</span>
         </div>
       </div>
@@ -615,7 +632,7 @@
         </div>
         <div class="field">
           <label>Assegnatari</label>
-          <div class="assignee-list" id="e-assignee-list"></div>
+          <button type="button" class="assignee-btn empty" onclick="openAssigneeModal('edit')"><span id="e-assignee-summary">Seleziona persone…</span><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>
         </div>
         <div class="field">
           <label>Date</label>
@@ -664,6 +681,22 @@
       <span id="e-doc-link" class="modal-cur"></span>
       <button type="button" class="btn-sm" onclick="closeEditModal()">Annulla</button>
       <button type="button" class="btn-sm accent" id="e-save-btn" onclick="saveEditTask()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assignee picker modal -->
+<div id="assignee-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <div style="flex:1"><div class="modal-title">Seleziona assegnatari</div></div>
+      <button type="button" class="modal-back" onclick="closeAssigneeModal()">✕</button>
+    </div>
+    <div class="modal-list" id="assignee-modal-list"></div>
+    <div class="modal-ft">
+      <span class="modal-cur" id="assignee-modal-count">0 selezionati</span>
+      <button type="button" class="btn-sm" onclick="closeAssigneeModal()">Annulla</button>
+      <button type="button" class="btn-sm accent" onclick="confirmAssigneeModal()">Conferma</button>
     </div>
   </div>
 </div>
@@ -798,6 +831,44 @@
   function getCheckedAssignees(containerId) {
     return Array.prototype.slice.call(document.querySelectorAll('#'+containerId+' input:checked')).map(function(c){ return c.value; });
   }
+
+  // ── ASSIGNEE PICKER MODAL ───────────────────────────────────────────────────
+  var _createAssignees = [], _editAssignees = [], _assigneeTarget = 'create';
+
+  function assigneeSummary(emails) {
+    if (!emails.length) return 'Seleziona persone…';
+    if (emails.length === 1) return nameOf(emails[0]);
+    return emails.length + ' persone selezionate';
+  }
+  function updateAssigneeButton(target) {
+    var arr = target === 'edit' ? _editAssignees : _createAssignees;
+    var sumEl = document.getElementById((target === 'edit' ? 'e' : 'f') + '-assignee-summary');
+    sumEl.textContent = assigneeSummary(arr);
+    sumEl.parentNode.classList.toggle('empty', !arr.length);
+  }
+  function openAssigneeModal(target) {
+    _assigneeTarget = target;
+    renderAssigneeCheckboxes('assignee-modal-list', target === 'edit' ? _editAssignees : _createAssignees);
+    updateAssigneeModalCount();
+    document.getElementById('assignee-modal').classList.remove('hidden');
+  }
+  function closeAssigneeModal() {
+    document.getElementById('assignee-modal').classList.add('hidden');
+  }
+  function updateAssigneeModalCount() {
+    var n = document.querySelectorAll('#assignee-modal-list input:checked').length;
+    document.getElementById('assignee-modal-count').textContent = n + (n === 1 ? ' selezionato' : ' selezionati');
+  }
+  function confirmAssigneeModal() {
+    var picked = getCheckedAssignees('assignee-modal-list');
+    if (_assigneeTarget === 'edit') _editAssignees = picked; else _createAssignees = picked;
+    updateAssigneeButton(_assigneeTarget);
+    closeAssigneeModal();
+  }
+  document.getElementById('assignee-modal-list').addEventListener('change', updateAssigneeModalCount);
+  document.getElementById('assignee-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeAssigneeModal();
+  });
   var TF_KEYS = ['tf_logged_in','tf_hint','tf_name','tf_login_time','tf_token','tf_token_exp'];
 
   function _clearSession() { TF_KEYS.forEach(function(k){ localStorage.removeItem(k); }); }
@@ -994,7 +1065,8 @@
   async function loadTeamDropdown() {
     var result = await gasCall('getTeam');
     teamMembers = result.team || [];
-    renderAssigneeCheckboxes('f-assignee-list', []);
+    _createAssignees = [];
+    updateAssigneeButton('create');
   }
 
   // ── EDIT MODAL ─────────────────────────────────────────────────────────────
@@ -1010,7 +1082,8 @@
     document.getElementById('e-file-chosen').classList.add('hidden');
     document.getElementById('e-file-chosen').textContent = '';
 
-    renderAssigneeCheckboxes('e-assignee-list', taskAssignees(task));
+    _editAssignees = taskAssignees(task);
+    updateAssigneeButton('edit');
 
     _editDriveUrl = task.driveUrl || '';
     _editDriveName = '';
@@ -1125,7 +1198,7 @@
     btn.disabled = true; btn.textContent = 'Salvo…';
     try {
       var company    = document.getElementById('e-company').value.trim();
-      var assigneeArr = getCheckedAssignees('e-assignee-list');
+      var assigneeArr = _editAssignees;
       var assignee   = assigneeArr.join(', ');
       var assignDate = document.getElementById('e-assign-date').value;
       var deadline   = document.getElementById('e-deadline').value;
@@ -1332,7 +1405,7 @@
   var selectedFolderId='', selectedFiles=[];
   async function handleSubmit(e) {
     e.preventDefault();
-    var company=document.getElementById('f-company').value.trim(), assignees=getCheckedAssignees('f-assignee-list'), assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
+    var company=document.getElementById('f-company').value.trim(), assignees=_createAssignees, assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
     if (!company||!assignees.length||!assignDate||!deadline||!brief) { showToast('Compila tutti i campi obbligatori (almeno un assegnatario)','error'); return; }
     if (deadline<assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); return; }
     var btn=document.getElementById('submit-btn'); btn.disabled=true;
@@ -1348,6 +1421,7 @@
     document.getElementById('drive-label').textContent='Seleziona da Google Drive'; document.getElementById('drive-action').textContent='Sfoglia'; document.getElementById('drive-btn').className='drive-btn';
     document.getElementById('upload-group').classList.add('hidden'); document.getElementById('file-list').innerHTML='';
     selectedFiles=[]; selectedFolderId='';
+    _createAssignees=[]; updateAssigneeButton('create');
     var now=new Date(); document.getElementById('f-assign-date').value=now.toISOString().split('T')[0];
     var dl=new Date(now); dl.setDate(dl.getDate()+5); document.getElementById('f-deadline').value=dl.toISOString().split('T')[0];
   }
@@ -1622,7 +1696,7 @@
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
     var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div style="display:flex;align-items:center;gap:6px;">'+pencilBtn+'<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span></div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><span class="tc-status-lbl">Stato</span><select class="tc-status-sel" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div>'+pencilBtn+'</div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
@@ -1636,8 +1710,20 @@
   }
 
   // ── IN-APP CALENDAR ───────────────────────────────────────────────────────
-  var _calMonth = new Date(), _calSelectedDay = null, _calTasks = [];
+  var _calRef = new Date(), _calView = 'month', _calSelectedDay = null, _calTasks = [];
   var CAL_MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  var CAL_MON_SHORT = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  var CAL_DOW = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  var CAL_DOW_FULL = ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'];
+
+  function calStr(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function calWeekStart(d) {
+    var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() - ((x.getDay()+6)%7));
+    return x;
+  }
 
   async function loadCalendar() {
     try {
@@ -1648,30 +1734,73 @@
     }
   }
 
-  function calShiftMonth(delta) {
-    _calMonth = new Date(_calMonth.getFullYear(), _calMonth.getMonth() + delta, 1);
-    _calSelectedDay = null;
+  function setCalView(v) {
+    _calView = v;
+    var btns = document.querySelectorAll('#cal-viewtoggle .grp-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].dataset.cv === v);
+    renderCalendar();
+  }
+
+  function calShift(delta) {
+    if (_calView === 'week') _calRef = new Date(_calRef.getFullYear(), _calRef.getMonth(), _calRef.getDate() + delta*7);
+    else if (_calView === 'day') _calRef = new Date(_calRef.getFullYear(), _calRef.getMonth(), _calRef.getDate() + delta);
+    else { _calRef = new Date(_calRef.getFullYear(), _calRef.getMonth() + delta, 1); _calSelectedDay = null; }
     renderCalendar();
   }
 
   function renderCalendar() {
-    var year = _calMonth.getFullYear(), month = _calMonth.getMonth();
+    if (_calView === 'week') renderCalWeek();
+    else if (_calView === 'day') renderCalDayView();
+    else renderCalMonth();
+  }
+
+  function calRowHtml(t) {
+    var key = SK[t.status] || 'todo';
+    return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
+  }
+
+  function calTasksHtml(tasks) {
+    if (userRole === 'manager') {
+      var pg = {};
+      tasks.forEach(function(t) {
+        var as = taskAssignees(t);
+        if (!as.length) { (pg['— Non assegnato'] = pg['— Non assegnato'] || []).push(t); return; }
+        as.forEach(function(em) { var nm = nameOf(em); (pg[nm] = pg[nm] || []).push(t); });
+      });
+      return Object.keys(pg).sort().map(function(nm) {
+        return '<div class="ov-group-hd">'+esc(nm)+' <span class="ov-group-count">'+pg[nm].length+'</span></div>'
+          + pg[nm].map(calRowHtml).join('');
+      }).join('');
+    }
+    return tasks.map(calRowHtml).join('');
+  }
+
+  function calDayBlock(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    var label = CAL_DOW_FULL[(d.getDay()+6)%7] + ' ' + d.getDate() + ' ' + CAL_MON_SHORT[d.getMonth()];
+    var tasks = _calTasks.filter(function(t){ return t.deadline === dateStr; });
+    var cls = 'cal-dayblock' + (dateStr === calStr(new Date()) ? ' today' : '');
+    var html = '<div class="'+cls+'"><div class="cal-dayblock-hd">'+esc(label)+' <span class="ov-group-count">'+tasks.length+'</span></div>';
+    html += tasks.length ? calTasksHtml(tasks) : '<div class="cal-day-empty">Nessuna scadenza</div>';
+    return html + '</div>';
+  }
+
+  function renderCalMonth() {
+    document.getElementById('cal-grid').classList.remove('hidden');
+    document.getElementById('cal-legend').classList.remove('hidden');
+    var year = _calRef.getFullYear(), month = _calRef.getMonth();
     document.getElementById('cal-title').textContent = CAL_MONTHS[month] + ' ' + year;
 
     var byDay = {};
-    _calTasks.forEach(function(t) {
-      if (!t.deadline) return;
-      (byDay[t.deadline] = byDay[t.deadline] || []).push(t);
-    });
+    _calTasks.forEach(function(t) { if (t.deadline) (byDay[t.deadline] = byDay[t.deadline] || []).push(t); });
 
-    var first = new Date(year, month, 1);
-    var startDow = (first.getDay() + 6) % 7;
+    var startDow = (new Date(year, month, 1).getDay() + 6) % 7;
     var daysInMonth = new Date(year, month + 1, 0).getDate();
-    var todayStr = new Date().toISOString().split('T')[0];
+    var todayStr = calStr(new Date());
 
     var grid = document.getElementById('cal-grid');
     grid.innerHTML = '';
-    ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(function(d) {
+    CAL_DOW.forEach(function(d) {
       var el = document.createElement('div'); el.className = 'cal-dow'; el.textContent = d;
       grid.appendChild(el);
     });
@@ -1687,15 +1816,10 @@
       var dots = tasks.slice(0,6).map(function(t) { return '<span class="cal-dot cd-'+(SK[t.status]||'todo')+'"></span>'; }).join('');
       cell.innerHTML = '<span class="cal-daynum">'+day+'</span><div class="cal-dots">'+dots+'</div>';
       cell.dataset.date = dateStr;
-      cell.addEventListener('click', function() { _calSelectedDay = this.dataset.date; renderCalendar(); });
+      cell.addEventListener('click', function() { _calSelectedDay = this.dataset.date; renderCalMonth(); });
       grid.appendChild(cell);
     }
     renderCalDay();
-  }
-
-  function calRowHtml(t) {
-    var key = SK[t.status] || 'todo';
-    return '<div class="ov-row"><div class="ov-row-title"><div class="ov-row-name">'+esc(t.company)+'</div></div><span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(t.status)+'</span></div>';
   }
 
   function renderCalDay() {
@@ -1706,22 +1830,31 @@
     }
     var tasks = _calTasks.filter(function(t){ return t.deadline === _calSelectedDay; });
     var html = '<div class="section-hd" style="margin-top:22px">Scadenze · ' + esc(fmt(_calSelectedDay)) + '</div>';
-    if (!tasks.length) { detail.innerHTML = html + '<div class="ov-empty">Nessun task in scadenza</div>'; return; }
-    if (userRole === 'manager') {
-      var pg = {};
-      tasks.forEach(function(t) {
-        var as = taskAssignees(t);
-        if (!as.length) { (pg['— Non assegnato'] = pg['— Non assegnato'] || []).push(t); return; }
-        as.forEach(function(em) { var nm = nameOf(em); (pg[nm] = pg[nm] || []).push(t); });
-      });
-      Object.keys(pg).sort().forEach(function(nm) {
-        html += '<div class="ov-group-hd">'+esc(nm)+' <span class="ov-group-count">'+pg[nm].length+'</span></div>';
-        html += pg[nm].map(calRowHtml).join('');
-      });
-    } else {
-      html += tasks.map(calRowHtml).join('');
+    detail.innerHTML = html + (tasks.length ? calTasksHtml(tasks) : '<div class="ov-empty">Nessun task in scadenza</div>');
+  }
+
+  function renderCalWeek() {
+    document.getElementById('cal-grid').classList.add('hidden');
+    document.getElementById('cal-legend').classList.add('hidden');
+    var ws = calWeekStart(_calRef);
+    var we = new Date(ws); we.setDate(we.getDate() + 6);
+    document.getElementById('cal-title').textContent =
+      ws.getDate()+' '+CAL_MON_SHORT[ws.getMonth()]+' – '+we.getDate()+' '+CAL_MON_SHORT[we.getMonth()]+' '+we.getFullYear();
+    var html = '';
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(ws); d.setDate(d.getDate() + i);
+      html += calDayBlock(calStr(d));
     }
-    detail.innerHTML = html;
+    document.getElementById('cal-detail').innerHTML = html;
+  }
+
+  function renderCalDayView() {
+    document.getElementById('cal-grid').classList.add('hidden');
+    document.getElementById('cal-legend').classList.add('hidden');
+    var d = _calRef;
+    document.getElementById('cal-title').textContent =
+      CAL_DOW_FULL[(d.getDay()+6)%7] + ' ' + d.getDate() + ' ' + CAL_MONTHS[d.getMonth()];
+    document.getElementById('cal-detail').innerHTML = calDayBlock(calStr(d));
   }
 
   // Auto-refresh data every 5 minutes when visible
