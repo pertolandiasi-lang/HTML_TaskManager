@@ -356,15 +356,9 @@ function setupSheetValidation_() {
     .build();
   taskSheet.getRange(2, 9, extraRows, 1).setDataValidation(statusRule);
 
-  // Assignee dropdown from Team!B column — col C (3)
-  // allowInvalid(true): the cell can hold multiple comma-separated emails
-  var teamLast = Math.max(teamSheet.getLastRow(), 2);
-  var emailRange = teamSheet.getRange('B2:B' + teamLast);
-  var emailRule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(emailRange, true)
-    .setAllowInvalid(true)
-    .build();
-  taskSheet.getRange(2, 3, extraRows, 1).setDataValidation(emailRule);
+  // NOTE: the assignee dropdown (col C) is intentionally NOT set here.
+  // It must be created via the Sheets UI so the native
+  // "Allow multiple selections" toggle stays available.
 
   // Date picker for assignDate (col D=4) and deadline (col E=5)
   var dateRule = SpreadsheetApp.newDataValidation()
