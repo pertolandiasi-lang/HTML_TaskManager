@@ -255,12 +255,29 @@
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
       animation: toastPop .28s cubic-bezier(.16,1,.3,1);
     }
-    .toast.success { border-top: 3px solid var(--primary-light); }
+    .toast.success { background: #15301c; border: 1px solid rgba(63,185,80,.6); color: #d7f5de; }
     .toast.error   { border-top: 3px solid var(--status-todo); }
     @keyframes toastPop {
       from { transform: translate(-50%, -50%) scale(.85); opacity: 0; }
       to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
     }
+
+    /* ── PERSISTENT ERROR CARD ──────────────────────────────── */
+    #error-card {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      top: 80px; width: calc(100% - 24px); max-width: 460px;
+      background: #2c1416; border: 1px solid var(--status-todo);
+      border-radius: 14px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      z-index: 1300; box-shadow: 0 14px 44px rgba(0,0,0,.6);
+      animation: errSlide .3s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes errSlide { from { opacity: 0; transform: translateX(-50%) translateY(-14px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    .ec-icon { font-size: 20px; flex-shrink: 0; }
+    .ec-body { flex: 1; min-width: 0; }
+    .ec-title { font-size: 14px; font-weight: 700; color: #ff8f8f; margin-bottom: 2px; }
+    .ec-msg { font-size: 13px; color: #f0c8c8; line-height: 1.5; word-break: break-word; }
+    .ec-btn { flex-shrink: 0; background: var(--status-todo); color: #2c1416; border: none; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── SPLASH ─────────────────────────────────────────────── */
@@ -453,6 +470,14 @@
 <body>
 
 <div id="toast" class="toast hidden"></div>
+<div id="error-card" class="hidden">
+  <div class="ec-icon">⚠️</div>
+  <div class="ec-body">
+    <div class="ec-title">Si è verificato un errore</div>
+    <div class="ec-msg" id="error-card-msg"></div>
+  </div>
+  <button type="button" class="ec-btn" onclick="dismissError()">Ho capito</button>
+</div>
 <div id="update-banner" class="hidden">
   <span class="ub-msg">🔄 Nuova versione disponibile</span>
   <button class="ub-btn" onclick="applyUpdate()">Aggiorna</button>
@@ -1229,66 +1254,54 @@
   async function saveEditTask() {
     if (!_editTask) return;
     var btn = document.getElementById('e-save-btn');
-    btn.disabled = true; btn.textContent = 'Salvo…';
-    try {
-      var company    = document.getElementById('e-company').value.trim();
-      var assigneeArr = _editAssignees;
-      var assignee   = assigneeArr.join(', ');
-      var assignDate = document.getElementById('e-assign-date').value;
-      var deadline   = document.getElementById('e-deadline').value;
-      var status     = document.getElementById('e-status').value;
-      var brief      = document.getElementById('e-brief').value.trim();
-      var fileInput  = document.getElementById('e-file');
+    var company    = document.getElementById('e-company').value.trim();
+    var assigneeArr = _editAssignees.slice();
+    var assignee   = assigneeArr.join(', ');
+    var assignDate = document.getElementById('e-assign-date').value;
+    var deadline   = document.getElementById('e-deadline').value;
+    var status     = document.getElementById('e-status').value;
+    var brief      = document.getElementById('e-brief').value.trim();
+    var fileInput  = document.getElementById('e-file');
 
-      if (!company || !assigneeArr.length || !assignDate || !deadline) { showToast('Compila tutti i campi obbligatori (almeno un assegnatario)','error'); btn.disabled=false; btn.textContent='Salva'; return; }
-      if (deadline < assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); btn.disabled=false; btn.textContent='Salva'; return; }
+    if (!company || !assigneeArr.length || !assignDate || !deadline) { showError('Compila tutti i campi obbligatori (almeno un assegnatario).'); return; }
+    if (deadline < assignDate) { showError('La deadline deve essere dopo la data di assegnazione.'); return; }
 
-      var driveUrl = _editDriveUrl || '';
-      if (fileInput.files && fileInput.files[0]) {
-        btn.textContent = 'Upload…';
-        driveUrl = await uploadFileToDrive(fileInput.files[0]);
-        _editDriveName = fileInput.files[0].name;
-      }
-
-      btn.textContent = 'Aggiorno sheet…';
-      var sheetData = await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/Tasks!A:K');
-      var rows = sheetData.values || [];
-      var rowIndex = -1;
-      for (var i = 1; i < rows.length; i++) { if (rows[i][0] === _editTask.id) { rowIndex = i + 1; break; } }
-      if (rowIndex === -1) throw new Error('Task non trovato nel foglio');
-
-      var range = 'Tasks!B'+rowIndex+':I'+rowIndex;
-      await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=RAW', {
-        method: 'PUT', body: { values: [[company, assignee, assignDate, deadline, brief, driveUrl, _editTask.docUrl||'', status]] }
-      });
-
-      btn.textContent = 'Aggiorno doc…';
-      if (_editTask.docUrl) {
-        try { await updateDocContent(_editTask.docUrl, company, assignee, assignDate, deadline, brief); }
-        catch(e) { console.warn('Doc update skipped:', e.message); }
-      }
-
-      btn.textContent = 'Aggiorno calendar…';
-      var COLOR_PAIRS = { 'Da fare':{'assign':'11','deadline':'11'}, 'In lavoro':{'assign':'5','deadline':'11'}, 'Completato':{'assign':'8','deadline':'10'} };
-      var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
-      var desc = 'Assegnatari: '+assigneeArr.map(nameOf).join(', ')+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(_editTask.docUrl?'\n\nDoc:\n'+_editTask.docUrl:'');
-      if (_editTask.assignEventId) {
-        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }); }
-        catch(e) { console.warn('Assign event patch skipped:', e.message); }
-      }
-      if (_editTask.deadlineEventId) {
-        try { await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+_editTask.deadlineEventId, { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline } }); }
-        catch(e) { console.warn('Deadline event patch skipped:', e.message); }
-      }
-
-      showToast('✓ Task aggiornato · Sheet, Calendar e Doc sincronizzati','success');
-      closeEditModal();
-      setTimeout(refreshCurrentView, 400);
-    } catch(e) {
-      showToast('Errore: '+e.message,'error');
-    } finally {
+    var driveUrl = _editDriveUrl || '';
+    var taskRef = _editTask;
+    if (fileInput.files && fileInput.files[0]) {
+      btn.disabled = true; btn.textContent = 'Upload…';
+      try { driveUrl = await uploadFileToDrive(fileInput.files[0]); }
+      catch(e) { btn.disabled=false; btn.textContent='Salva'; showError('Caricamento file non riuscito: '+e.message); return; }
       btn.disabled = false; btn.textContent = 'Salva';
     }
+
+    closeEditModal();
+    showToast('✓ Task "'+company+'" aggiornato','success');
+    saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl)
+      .then(function() { refreshCurrentView(); })
+      .catch(function(e) { showError('Aggiornamento del task "'+company+'" non riuscito: '+e.message+' — controlla il task.'); });
+  }
+
+  async function saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl) {
+    var sheetData = await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/Tasks!A:K');
+    var rows = sheetData.values || [];
+    var rowIndex = -1;
+    for (var i = 1; i < rows.length; i++) { if (rows[i][0] === taskRef.id) { rowIndex = i + 1; break; } }
+    if (rowIndex === -1) throw new Error('Task non trovato nel foglio');
+
+    var COLOR_PAIRS = { 'Da fare':{'assign':'11','deadline':'11'}, 'In lavoro':{'assign':'5','deadline':'11'}, 'Completato':{'assign':'8','deadline':'10'} };
+    var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
+    var desc = 'Assegnatari: '+assigneeArr.map(nameOf).join(', ')+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(taskRef.docUrl?'\n\nDoc:\n'+taskRef.docUrl:'');
+    var range = 'Tasks!B'+rowIndex+':I'+rowIndex;
+    var jobs = [
+      api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=RAW', {
+        method:'PUT', body:{ values:[[company, assignee, assignDate, deadline, brief, driveUrl, taskRef.docUrl||'', status]] }
+      })
+    ];
+    if (taskRef.docUrl) jobs.push(updateDocContent(taskRef.docUrl, company, assignee, assignDate, deadline, brief).catch(function(e){ console.warn('Doc update skipped:', e.message); }));
+    if (taskRef.assignEventId) jobs.push(api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+taskRef.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }).catch(function(e){ console.warn('Assign event patch skipped:', e.message); }));
+    if (taskRef.deadlineEventId) jobs.push(api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+taskRef.deadlineEventId, { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline } }).catch(function(e){ console.warn('Deadline event patch skipped:', e.message); }));
+    await Promise.all(jobs);
   }
 
   // ── TASK CREATION ────────────────────────────────────────────────────────────
@@ -1299,10 +1312,14 @@
     var namesStr = assignees.map(nameOf).join(', ');
     var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] } });
     var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
-    await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
     var desc='Assegnatari: '+namesStr+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
-    var aEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11' } });
-    var dEv = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11' } });
+    // brief insert + both calendar events run in parallel (all only need docId)
+    var res = await Promise.all([
+      api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } }),
+      api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11' } }),
+      api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11' } })
+    ]);
+    var aEv = res[1], dEv = res[2];
     var taskId=Date.now().toString();
     await sheetsAppend('Tasks!A:L', [[taskId,company,assigneeStr,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare',aEv.id,dEv.id,new Date().toISOString()]]);
     return taskId;
@@ -1331,6 +1348,23 @@
   document.getElementById('toast').addEventListener('click', function() {
     this.className = 'toast hidden'; clearTimeout(_tt);
   });
+
+  // Persistent red error card — stays until the user acknowledges it
+  function showError(msg) {
+    var card = document.getElementById('error-card');
+    document.getElementById('error-card-msg').textContent = msg;
+    var hdr = document.querySelector('.header');
+    if (hdr && !hdr.closest('.hidden')) {
+      var b = hdr.getBoundingClientRect().bottom;
+      card.style.top = (b > 0 ? b + 12 : 80) + 'px';
+    } else {
+      card.style.top = '80px';
+    }
+    card.classList.remove('hidden');
+  }
+  function dismissError() {
+    document.getElementById('error-card').classList.add('hidden');
+  }
 
   var _newTasksChecked = false;
   function checkNewTasks(tasks) {
@@ -1439,15 +1473,25 @@
   var selectedFolderId='', selectedFiles=[];
   async function handleSubmit(e) {
     e.preventDefault();
-    var company=document.getElementById('f-company').value.trim(), assignees=_createAssignees, assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
-    if (!company||!assignees.length||!assignDate||!deadline||!brief) { showToast('Compila tutti i campi obbligatori (almeno un assegnatario)','error'); return; }
-    if (deadline<assignDate) { showToast('La deadline deve essere dopo la data di assegnazione','error'); return; }
-    var btn=document.getElementById('submit-btn'); btn.disabled=true;
-    if (selectedFiles.length>0&&selectedFolderId) { btn.textContent='Caricamento file...'; try { await uploadAllFiles(selectedFolderId); } catch(err) { btn.disabled=false; resetSubmitBtn(); return; } }
-    btn.textContent='Creazione...';
-    try { await createTask({ company,assignees,assignDate,deadline,brief,driveUrl }); showToast('✓ Task creato! Sheet e Calendar aggiornati','success'); resetForm(); }
-    catch(err) { showToast('Errore: '+err.message,'error'); }
-    btn.disabled=false; resetSubmitBtn();
+    var company=document.getElementById('f-company').value.trim(), assignees=_createAssignees.slice(), assignDate=document.getElementById('f-assign-date').value, deadline=document.getElementById('f-deadline').value, brief=document.getElementById('f-brief').value.trim(), driveUrl=document.getElementById('f-drive-url').value.trim();
+    if (!company||!assignees.length||!assignDate||!deadline||!brief) { showError('Compila tutti i campi obbligatori (almeno un assegnatario).'); return; }
+    if (deadline<assignDate) { showError('La deadline deve essere dopo la data di assegnazione.'); return; }
+    var btn=document.getElementById('submit-btn');
+    if (selectedFiles.length>0&&selectedFolderId) {
+      btn.disabled=true; btn.textContent='Caricamento file...';
+      try { await uploadAllFiles(selectedFolderId); }
+      catch(err) { btn.disabled=false; resetSubmitBtn(); showError('Caricamento file non riuscito: '+err.message); return; }
+      btn.disabled=false; resetSubmitBtn();
+    }
+    var data = { company:company, assignees:assignees, assignDate:assignDate, deadline:deadline, brief:brief, driveUrl:driveUrl };
+    resetForm();
+    showToast('✓ Task "'+company+'" in creazione…','success');
+    createTask(data).then(function() {
+      showToast('✓ Task "'+company+'" creato!','success');
+      refreshCurrentView();
+    }).catch(function(err) {
+      showError('Creazione del task "'+company+'" non riuscita: '+err.message+' — verifica nella lista task.');
+    });
   }
   function resetSubmitBtn() { document.getElementById('submit-btn').innerHTML='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crea task'; }
   function resetForm() {
@@ -1732,7 +1776,7 @@
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
     var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div>'+pencilBtn+'</div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div>'+pencilBtn+'</div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value,this)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
@@ -1938,24 +1982,36 @@
     }
   });
 
-  async function changeStatus(taskId, newStatus) {
-    var card=document.getElementById('card-'+taskId), sel=card.querySelector('select'); sel.disabled=true;
-    try { await updateTaskStatus(taskId,newStatus); showToast('✓ Stato aggiornato · Calendar sincronizzato','success'); closeTaskDetail(); setTimeout(refreshCurrentView,400); }
-    catch(e) { sel.disabled=false; showToast('Errore: '+e.message,'error'); }
+  function changeStatus(taskId, newStatus, selEl) {
+    var task = _taskCache[taskId];
+    var prev = task ? task.status : newStatus;
+    // optimistic — update the UI instantly
+    if (task) task.status = newStatus;
+    if (selEl) selEl.className = 'tc-status-sel tsel-' + (SK[newStatus] || 'todo');
+    showToast('✓ Stato aggiornato: ' + newStatus, 'success');
+    // background sync
+    updateTaskStatus(taskId, newStatus).then(function() {
+      refreshCurrentView();
+    }).catch(function(e) {
+      if (task) task.status = prev;
+      if (selEl) { selEl.value = prev; selEl.className = 'tc-status-sel tsel-' + (SK[prev] || 'todo'); }
+      showError('Stato del task "' + (task ? task.company : taskId) + '" NON salvato: ' + e.message + ' — controlla lo stato del task.');
+    });
   }
 
-  async function deleteTask(taskId) {
+  function deleteTask(taskId) {
     if (!confirm('Eliminare questo task? Verranno rimossi anche gli eventi su Calendar e la riga dal foglio.')) return;
-    var btn=document.getElementById('del-'+taskId); if (btn) { btn.disabled=true; btn.textContent='…'; }
-    try {
-      await gasCall('deleteTask', { taskId: taskId });
-      showToast('✓ Task eliminato','success');
-      closeTaskDetail();
-      setTimeout(refreshCurrentView,400);
-    } catch(e) {
-      if (btn) { btn.disabled=false; btn.textContent='Elimina'; }
-      showToast('Errore: '+e.message,'error');
-    }
+    var task = _taskCache[taskId];
+    var cardEl = document.getElementById('card-'+taskId);
+    if (cardEl) cardEl.remove();
+    closeTaskDetail();
+    showToast('✓ Task "' + (task ? task.company : '') + '" eliminato', 'success');
+    gasCall('deleteTask', { taskId: taskId }).then(function() {
+      refreshCurrentView();
+    }).catch(function(e) {
+      showError('Eliminazione del task "' + (task ? task.company : taskId) + '" non riuscita: ' + e.message + ' — il task potrebbe essere ancora presente.');
+      refreshCurrentView();
+    });
   }
 </script>
 </body>
