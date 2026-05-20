@@ -280,6 +280,8 @@
     .ec-msg { font-size: 13px; color: #f0c8c8; line-height: 1.55; word-break: break-word; }
     .ec-btn { background: var(--status-todo); color: #2c1416; border: none; border-radius: 9px; padding: 11px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
     .err-badge { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px; line-height: 1; flex-shrink: 0; }
+    .menu-err { font-size: 14px; line-height: 1; }
+    .nav-err  { margin-left: auto; font-size: 14px; line-height: 1; }
     .tc-hd-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -524,6 +526,7 @@
         <button id="menu-btn" class="menu-btn hidden" onclick="toggleMenu()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           <span>Menu</span>
+          <span id="menu-err" class="menu-err hidden">⚠️</span>
         </button>
         <div class="avatar" id="hdr-avatar" onclick="signOut()" title="Esci">?</div>
         <span class="role-badge" id="hdr-role"></span>
@@ -538,6 +541,7 @@
     </button>
     <button class="nav-item" data-view="employee" onclick="navTo('employee')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>I miei task
+      <span id="nav-err-employee" class="nav-err hidden">⚠️</span>
     </button>
     <button class="nav-item" data-view="team" onclick="navTo('team')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team
@@ -1074,6 +1078,7 @@
       gasCall('getTasks').then(function(r) { checkNewTasks(r.tasks || []); }).catch(function(){});
     }
     checkPendingErrors();
+    updateErrorIndicators();
   }
 
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
@@ -1366,6 +1371,12 @@
     _currentErrorKey = key;
     document.getElementById('error-card-msg').textContent = msg;
     document.getElementById('error-card').classList.remove('hidden');
+    updateErrorIndicators();
+  }
+  function updateErrorIndicators() {
+    var has = Object.keys(_errors).length > 0;
+    var m = document.getElementById('menu-err'); if (m) m.classList.toggle('hidden', !has);
+    var n = document.getElementById('nav-err-employee'); if (n) n.classList.toggle('hidden', !has);
   }
   function showStoredError(key) {
     var err = _errors[key];
@@ -1387,6 +1398,7 @@
     }
     _currentErrorKey = null;
     document.getElementById('error-card').classList.add('hidden');
+    updateErrorIndicators();
   }
   function checkPendingErrors() {
     for (var k in _errors) {
