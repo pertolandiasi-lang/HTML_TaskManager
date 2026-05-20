@@ -35,7 +35,7 @@ function doGet(e) {
 }
 
 function authorize() {
-  UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=test');
+  UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=test', { muteHttpExceptions: true });
   SpreadsheetApp.openById(SHEET_ID);
   CalendarApp.getDefaultCalendar();
   var tmp = DocumentApp.create('_auth_test_tmp');
