@@ -264,20 +264,23 @@
 
     /* ── PERSISTENT ERROR CARD ──────────────────────────────── */
     #error-card {
-      position: fixed; left: 50%; transform: translateX(-50%);
-      top: 80px; width: calc(100% - 24px); max-width: 460px;
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: calc(100% - 32px); max-width: 420px;
       background: #2c1416; border: 1px solid var(--status-todo);
-      border-radius: 14px; padding: 14px 16px;
-      display: flex; align-items: center; gap: 12px;
-      z-index: 1300; box-shadow: 0 14px 44px rgba(0,0,0,.6);
-      animation: errSlide .3s cubic-bezier(.16,1,.3,1);
+      border-radius: 16px; padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+      z-index: 1300; box-shadow: 0 24px 64px rgba(0,0,0,.6);
+      animation: errPop .26s cubic-bezier(.16,1,.3,1);
     }
-    @keyframes errSlide { from { opacity: 0; transform: translateX(-50%) translateY(-14px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-    .ec-icon { font-size: 20px; flex-shrink: 0; }
-    .ec-body { flex: 1; min-width: 0; }
-    .ec-title { font-size: 14px; font-weight: 700; color: #ff8f8f; margin-bottom: 2px; }
-    .ec-msg { font-size: 13px; color: #f0c8c8; line-height: 1.5; word-break: break-word; }
-    .ec-btn { flex-shrink: 0; background: var(--status-todo); color: #2c1416; border: none; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
+    @keyframes errPop { from { opacity: 0; transform: translate(-50%,-50%) scale(.9); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+    .ec-head { display: flex; align-items: center; gap: 10px; }
+    .ec-icon { font-size: 22px; }
+    .ec-title { font-size: 15px; font-weight: 700; color: #ff8f8f; }
+    .ec-msg { font-size: 13px; color: #f0c8c8; line-height: 1.55; word-break: break-word; }
+    .ec-btn { background: var(--status-todo); color: #2c1416; border: none; border-radius: 9px; padding: 11px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+    .err-badge { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px; line-height: 1; flex-shrink: 0; }
+    .tc-hd-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── SPLASH ─────────────────────────────────────────────── */
@@ -471,11 +474,8 @@
 
 <div id="toast" class="toast hidden"></div>
 <div id="error-card" class="hidden">
-  <div class="ec-icon">⚠️</div>
-  <div class="ec-body">
-    <div class="ec-title">Si è verificato un errore</div>
-    <div class="ec-msg" id="error-card-msg"></div>
-  </div>
+  <div class="ec-head"><span class="ec-icon">⚠️</span><span class="ec-title">Si è verificato un errore</span></div>
+  <div class="ec-msg" id="error-card-msg"></div>
   <button type="button" class="ec-btn" onclick="dismissError()">Ho capito</button>
 </div>
 <div id="update-banner" class="hidden">
@@ -1073,6 +1073,7 @@
     if (userRole === 'manager' || userRole === 'employee') {
       gasCall('getTasks').then(function(r) { checkNewTasks(r.tasks || []); }).catch(function(){});
     }
+    checkPendingErrors();
   }
 
   async function sheetsAppend(range, values) { return api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+':append?valueInputOption=RAW', { method:'POST', body:{ values:values } }); }
@@ -1279,7 +1280,7 @@
     showToast('✓ Task "'+company+'" aggiornato','success');
     saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl)
       .then(function() { refreshCurrentView(); })
-      .catch(function(e) { showError('Aggiornamento del task "'+company+'" non riuscito: '+e.message+' — controlla il task.'); });
+      .catch(function(e) { showError('Aggiornamento del task "'+company+'" non riuscito: '+e.message+' — controlla il task.', taskRef.id, company); });
   }
 
   async function saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl) {
@@ -1349,21 +1350,48 @@
     this.className = 'toast hidden'; clearTimeout(_tt);
   });
 
-  // Persistent red error card — stays until the user acknowledges it
-  function showError(msg) {
-    var card = document.getElementById('error-card');
-    document.getElementById('error-card-msg').textContent = msg;
-    var hdr = document.querySelector('.header');
-    if (hdr && !hdr.closest('.hidden')) {
-      var b = hdr.getBoundingClientRect().bottom;
-      card.style.top = (b > 0 ? b + 12 : 80) + 'px';
-    } else {
-      card.style.top = '80px';
+  // ── ERROR TRACKING — persists across app restarts ──────────────────────────
+  var _errors = {}, _currentErrorKey = null;
+  try { _errors = JSON.parse(localStorage.getItem('tf_errors') || '{}'); } catch(e) { _errors = {}; }
+  function _saveErrors() { try { localStorage.setItem('tf_errors', JSON.stringify(_errors)); } catch(e){} }
+
+  // showError(msg) → transient; showError(msg, taskId, label) → persistent
+  function showError(msg, taskId, label) {
+    var key = null;
+    if (arguments.length >= 2) {
+      key = taskId || ('create_' + Date.now());
+      _errors[key] = { taskId: taskId || null, label: label || '', msg: msg };
+      _saveErrors();
     }
-    card.classList.remove('hidden');
+    _currentErrorKey = key;
+    document.getElementById('error-card-msg').textContent = msg;
+    document.getElementById('error-card').classList.remove('hidden');
   }
+  function showStoredError(key) {
+    var err = _errors[key];
+    if (!err) return;
+    _currentErrorKey = key;
+    document.getElementById('error-card-msg').textContent = err.msg;
+    document.getElementById('error-card').classList.remove('hidden');
+  }
+  function showTaskError(taskId) { showStoredError(taskId); }
   function dismissError() {
+    if (_currentErrorKey) {
+      var err = _errors[_currentErrorKey];
+      delete _errors[_currentErrorKey];
+      _saveErrors();
+      if (err && err.taskId) {
+        var c = document.getElementById('card-' + err.taskId);
+        if (c) { var b = c.querySelector('.err-badge'); if (b) b.remove(); }
+      }
+    }
+    _currentErrorKey = null;
     document.getElementById('error-card').classList.add('hidden');
+  }
+  function checkPendingErrors() {
+    for (var k in _errors) {
+      if (_errors[k] && !_errors[k].taskId) { showStoredError(k); return; }
+    }
   }
 
   var _newTasksChecked = false;
@@ -1490,7 +1518,7 @@
       showToast('✓ Task "'+company+'" creato!','success');
       refreshCurrentView();
     }).catch(function(err) {
-      showError('Creazione del task "'+company+'" non riuscita: '+err.message+' — verifica nella lista task.');
+      showError('Creazione del task "'+company+'" non riuscita: '+err.message+' — verifica nella lista task.', null, company);
     });
   }
   function resetSubmitBtn() { document.getElementById('submit-btn').innerHTML='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Crea task'; }
@@ -1776,7 +1804,8 @@
     var card=document.createElement('article'); card.className='task-card'+(key==='done'?' done':''); card.id='card-'+task.id;
     var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div>'+pencilBtn+'</div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value,this)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+    var errBadge=_errors[task.id]?'<button class="err-badge" onclick="showTaskError(\''+esc(task.id)+'\')" title="Errore di sincronizzazione — tocca per i dettagli">⚠️</button>':'';
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div class="tc-hd-right">'+errBadge+pencilBtn+'</div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value,this)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
     return card;
   }
 
@@ -1995,7 +2024,7 @@
     }).catch(function(e) {
       if (task) task.status = prev;
       if (selEl) { selEl.value = prev; selEl.className = 'tc-status-sel tsel-' + (SK[prev] || 'todo'); }
-      showError('Stato del task "' + (task ? task.company : taskId) + '" NON salvato: ' + e.message + ' — controlla lo stato del task.');
+      showError('Stato del task "' + (task ? task.company : taskId) + '" NON salvato: ' + e.message + ' — controlla lo stato del task.', taskId, (task ? task.company : ''));
     });
   }
 
@@ -2009,7 +2038,7 @@
     gasCall('deleteTask', { taskId: taskId }).then(function() {
       refreshCurrentView();
     }).catch(function(e) {
-      showError('Eliminazione del task "' + (task ? task.company : taskId) + '" non riuscita: ' + e.message + ' — il task potrebbe essere ancora presente.');
+      showError('Eliminazione del task "' + (task ? task.company : taskId) + '" non riuscita: ' + e.message + ' — il task potrebbe essere ancora presente.', taskId, (task ? task.company : ''));
       refreshCurrentView();
     });
   }
