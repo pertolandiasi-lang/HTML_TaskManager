@@ -178,12 +178,22 @@
     .tc-links { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
     .tc-link { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; color: var(--text-2); background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 7px; text-decoration: none; transition: border-color .15s, color .15s; }
     .tc-link:hover { border-color: rgba(174,139,245,.4); color: var(--primary-light); }
+    .tc-assignee-status { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--border); }
+    .aslot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+    .aslot .s-dot { width: 8px; height: 8px; box-shadow: 0 0 0 2px rgba(255,255,255,.04); }
+    .sd-todo     { background: var(--status-todo) !important; }
+    .sd-progress { background: var(--status-prog) !important; }
+    .sd-done     { background: var(--status-done) !important; }
     .tc-status-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .tc-status-sel { appearance: none; -webkit-appearance: none; border-radius: 9999px; padding: 8px 34px 8px 15px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; border: 1px solid; outline: none; background-repeat: no-repeat; background-position: right 12px center; }
-    .tc-status-sel.tsel-todo     { color: var(--status-todo); background-color: rgba(255,107,107,.14); border-color: rgba(255,107,107,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff6b6b' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
-    .tc-status-sel.tsel-progress { color: var(--status-prog); background-color: rgba(212,184,74,.14); border-color: rgba(212,184,74,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d4b84a' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
-    .tc-status-sel.tsel-done     { color: var(--status-done); background-color: rgba(63,185,80,.14); border-color: rgba(63,185,80,.5); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%233fb950' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
+    .tc-status-wrap { position: relative; display: inline-block; }
+    .tc-status-sel { appearance: none; -webkit-appearance: none; border-radius: 9999px; padding: 8px 34px 8px 15px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; border: 1px solid; outline: none; background-image: none; }
+    .tc-status-sel.tsel-todo     { color: var(--status-todo); background-color: rgba(255,107,107,.14); border-color: rgba(255,107,107,.5); }
+    .tc-status-sel.tsel-progress { color: var(--status-prog); background-color: rgba(212,184,74,.14); border-color: rgba(212,184,74,.5); }
+    .tc-status-sel.tsel-done     { color: var(--status-done); background-color: rgba(63,185,80,.14); border-color: rgba(63,185,80,.5); }
     .tc-status-sel option { color: var(--text); background: var(--card-2); font-weight: 600; }
+    .tc-status-arrow { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; pointer-events: none; color: var(--status-todo); }
+    .tc-status-wrap.tsel-progress .tc-status-arrow { color: var(--status-prog); }
+    .tc-status-wrap.tsel-done     .tc-status-arrow { color: var(--status-done); }
     .btn-delete { background: none; border: 1px solid var(--border); border-radius: 7px; color: var(--text-3); cursor: pointer; font-size: 12px; padding: 5px 10px; transition: border-color .15s, color .15s; }
     .btn-delete:hover { border-color: rgba(255,80,80,.5); color: #ff6060; }
 
@@ -289,6 +299,25 @@
     #splash { position: fixed; inset: 0; background: var(--bg); z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
     .splash-spin { width: 22px; height: 22px; border: 2px solid var(--border); border-top-color: var(--primary-light); border-radius: 50%; animation: spin .8s linear infinite; margin-top: 18px; }
 
+    /* ── SESSION-STALE BANNER ──────────────────────────────── */
+    #session-banner {
+      position: fixed;
+      left: 12px; right: 12px;
+      top: calc(env(safe-area-inset-top) + 12px);
+      background: var(--card-2); color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 11px 14px;
+      display: flex; align-items: center; gap: 10px;
+      z-index: 1100; font-size: 13px;
+      box-shadow: 0 10px 32px rgba(0,0,0,.4);
+    }
+    #session-banner .sb-msg { flex: 1; color: var(--text-2); }
+    #session-banner .sb-btn {
+      background: var(--primary); color: var(--primary-fg);
+      border: none; padding: 7px 13px; border-radius: 8px;
+      font-weight: 700; cursor: pointer; font-family: inherit; font-size: 13px;
+    }
+
     /* ── UPDATE BANNER ──────────────────────────────────────── */
     #update-banner {
       position: fixed;
@@ -314,7 +343,10 @@
     #ptr-pill {
       position: fixed;
       top: calc(env(safe-area-inset-top) + 58px);
-      left: 50%; transform: translateX(-50%) translateY(-90px);
+      left: 0; right: 0; margin: 0 auto;
+      width: max-content; max-width: calc(100% - 24px);
+      min-width: 220px; text-align: center;
+      transform: translateY(-90px);
       background: var(--card-2); border: 1px solid var(--border);
       border-radius: 20px; padding: 7px 16px;
       font-size: 12px; color: var(--text-2);
@@ -322,7 +354,7 @@
       pointer-events: none; opacity: 0;
       transition: transform .22s cubic-bezier(.16,1,.3,1), opacity .22s;
     }
-    #ptr-pill.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #ptr-pill.show { transform: translateY(0); opacity: 1; }
 
     /* ── OVERVIEW STATS ─────────────────────────────────── */
     .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
@@ -484,6 +516,10 @@
   <span class="ub-msg">🔄 Nuova versione disponibile</span>
   <button class="ub-btn" onclick="applyUpdate()">Aggiorna</button>
 </div>
+<div id="session-banner" class="hidden">
+  <span class="sb-msg">Sessione Google scaduta</span>
+  <button class="sb-btn" onclick="refreshSession()">Aggiorna</button>
+</div>
 <div id="ptr-pill"></div>
 <div id="splash" class="hidden">
   <div class="brand-logo lg">
@@ -502,7 +538,7 @@
       <svg class="bl-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
       <span class="bl-task">Task</span>
     </div>
-    <div class="signin-sub">Gestione task del team con sync su Google Sheets, Calendar e Drive.</div>
+    <div class="signin-sub">Gestione task del team con sync su Google Sheets e Drive.</div>
     <button class="btn-google" id="signin-btn" onclick="signIn()">
       <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       Accedi con Google
@@ -542,9 +578,6 @@
     <button class="nav-item" data-view="employee" onclick="navTo('employee')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>I miei task
       <span id="nav-err-employee" class="nav-err hidden">⚠️</span>
-    </button>
-    <button class="nav-item" data-view="team" onclick="navTo('team')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team
     </button>
     <button class="nav-item" data-view="calendar" onclick="navTo('calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario
@@ -595,7 +628,7 @@
               </div>
             </div>
             <div class="form-ft">
-              <span class="form-hint">Verranno notificati Sheet e Calendar</span>
+              <span class="form-hint">Salvato su Sheet e Drive</span>
               <button type="submit" id="submit-btn" class="btn-primary"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crea task</button>
             </div>
           </form>
@@ -606,11 +639,6 @@
     <div id="view-employee" class="hidden">
       <div id="emp-hd" class="emp-hd"><div><h2 class="emp-title">I miei task</h2><p class="emp-sub">Loggato come <span id="emp-name"></span></p></div></div>
       <div id="task-sections"></div>
-    </div>
-
-    <div id="view-team" class="hidden">
-      <div class="emp-hd"><div><h2 class="emp-title">Team</h2><p class="emp-sub">Task assegnati al resto del team</p></div></div>
-      <div id="team-sections"></div>
     </div>
 
     <div id="view-calendar" class="hidden">
@@ -674,14 +702,6 @@
             <div><label for="e-assign-date" style="font-size:11px;color:var(--text-3);">Assegnazione</label><input type="date" id="e-assign-date" required></div>
             <div><label for="e-deadline" style="font-size:11px;color:var(--text-3);">Deadline</label><input type="date" id="e-deadline" required></div>
           </div>
-        </div>
-        <div class="field">
-          <label for="e-status">Stato</label>
-          <select id="e-status">
-            <option value="Da fare">Da fare</option>
-            <option value="In lavoro">In lavoro</option>
-            <option value="Completato">Completato</option>
-          </select>
         </div>
         <div class="field">
           <label for="e-brief">Brief / istruzioni</label>
@@ -834,7 +854,7 @@
   const CLIENT_ID = '848444804320-ndpeev8k3bs0o71h7orac09liohr7kmc.apps.googleusercontent.com';
   const SHEET_ID  = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
   const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxPO690wTE3ntdbZCS2f5CFETLn5JsqSdxlKpQFmfgmkk73lZdNspNQPK4wHdjCdHzX-Q/exec';
-  const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+  const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   let accessToken = null, tokenClient = null, userEmail = null, userName = null, userRole = null, silentAttempt = false;
   var teamMembers = [], _taskCache = {}, _editTask = null, _editDriveUrl = '', _editDriveName = '', _driveBrowserTarget = 'create';
@@ -986,11 +1006,25 @@
     document.getElementById('signin-btn').disabled = true;
     tokenClient.requestAccessToken({ prompt: 'select_account' });
   }
+  function showSessionBanner() {
+    var b = document.getElementById('session-banner');
+    if (b) b.classList.remove('hidden');
+  }
+  function hideSessionBanner() {
+    var b = document.getElementById('session-banner');
+    if (b) b.classList.add('hidden');
+  }
+  function refreshSession() {
+    if (!tokenClient) { showToast('Google non ancora caricato, riprova', 'error'); return; }
+    hideSessionBanner();
+    tokenClient.requestAccessToken({ prompt: 'select_account', login_hint: localStorage.getItem('tf_hint') || '' });
+  }
   function signOut() {
     if (accessToken) google.accounts.oauth2.revoke(accessToken);
     accessToken = null;
     _clearSession();
-    document.getElementById('signin-sub').textContent = 'Gestione task del team con sync su Google Sheets, Calendar e Drive.';
+    _viewLoaded = { employee: false, overview: false };
+    hideSessionBanner();
     document.getElementById('app').classList.add('hidden');
     document.getElementById('signin-screen').classList.remove('hidden');
     document.getElementById('signin-btn').disabled = false;
@@ -1002,28 +1036,49 @@
         var _lt = parseInt(localStorage.getItem('tf_login_time') || '0');
         var _withinWindow = localStorage.getItem('tf_logged_in') && (!_lt || (Date.now() - _lt) < 30 * 86400000);
         if (_withinWindow) {
-          // Silent auth always fails on iOS (ITP blocks the iframe) — skip the sign-in
-          // screen entirely and auto-trigger the real OAuth flow. User just taps their
-          // Google account in the native sheet, no manual button press needed.
-          tokenClient.requestAccessToken({ prompt: 'select_account', login_hint: localStorage.getItem('tf_hint') || '' });
+          // Silent auth always fails on iOS (ITP). Do NOT auto-pop select_account —
+          // that's what makes the app feel like it's constantly asking for login.
+          // Instead surface a tap-to-refresh banner; if we have a still-valid cached
+          // token, keep the app running on it in the meantime.
+          var _exp = parseInt(localStorage.getItem('tf_token_exp') || '0');
+          if (accessToken && _exp && Date.now() < _exp) {
+            showSessionBanner();   // proactive refresh failed but current token is fine
+            document.getElementById('signin-btn').disabled = false;
+            return;
+          }
+          // Cold-open and no usable token: show the app shell + banner. User taps it
+          // when they're actually ready to sign in.
+          showSessionBanner();
+          document.getElementById('splash').classList.add('hidden');
+          document.getElementById('signin-screen').classList.remove('hidden');
+          document.getElementById('signin-btn').disabled = false;
         } else {
           _clearSession();
           document.getElementById('signin-btn').disabled = false;
         }
         return;
       }
-      // Background proactive refresh or cancelled OAuth — no UI needed
+      // Background proactive refresh or cancelled OAuth.
       var _silentErrs = ['interaction_required','consent_required','popup_closed_by_user','access_denied'];
-      if (_silentErrs.indexOf(resp.error) >= 0) { document.getElementById('signin-btn').disabled = false; return; }
+      if (_silentErrs.indexOf(resp.error) >= 0) {
+        document.getElementById('signin-btn').disabled = false;
+        // If the refresh failed close to expiry, the next API call will 401.
+        // Surface the banner now so the user can re-auth deliberately.
+        var _exp = parseInt(localStorage.getItem('tf_token_exp') || '0');
+        if (!accessToken || !_exp || Date.now() > (_exp - 60 * 1000)) showSessionBanner();
+        return;
+      }
       showToast('Errore: ' + resp.error, 'error');
       document.getElementById('signin-btn').disabled = false;
       return;
     }
     silentAttempt = false;
     document.getElementById('signin-btn').disabled = false;
+    hideSessionBanner();
     accessToken = resp.access_token;
-    // Persist token so next open skips OAuth entirely
-    var expMs = ((resp.expires_in || 3600) - 60) * 1000;
+    // Persist token so next open skips OAuth entirely. The 30s margin is the small
+    // safety buffer for clock skew between client and Google's auth servers.
+    var expMs = ((resp.expires_in || 3600) - 30) * 1000;
     localStorage.setItem('tf_token', accessToken);
     localStorage.setItem('tf_token_exp', (Date.now() + expMs).toString());
     try { await loadUserAndInit(); } catch(e) { showToast('Errore: ' + e.message, 'error'); }
@@ -1034,6 +1089,7 @@
     var headers = { 'Authorization': 'Bearer ' + accessToken };
     if (opts.body && typeof opts.body === 'object') { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.body); }
     var res = await fetch(url, Object.assign({}, opts, { headers: Object.assign(headers, opts.headers || {}) }));
+    if (res.status === 401) showSessionBanner();
     if (res.status === 204) return {};
     var data = await res.json();
     if (!res.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
@@ -1061,7 +1117,6 @@
       roleEl.textContent = 'Dipendente'; roleEl.className = 'role-badge employee';
       document.getElementById('menu-btn').classList.remove('hidden');
       document.querySelector('#nav-menu .nav-item[data-view="manager"]').classList.add('hidden');
-      document.querySelector('#nav-menu .nav-item[data-view="team"]').classList.add('hidden');
       switchView('employee');
     } else {
       document.getElementById('view-unauth').classList.remove('hidden');
@@ -1141,7 +1196,6 @@
     document.getElementById('e-company').value    = task.company    || '';
     document.getElementById('e-assign-date').value = task.assignDate || '';
     document.getElementById('e-deadline').value   = task.deadline   || '';
-    document.getElementById('e-status').value     = task.status     || 'Da fare';
     document.getElementById('e-brief').value      = task.brief      || '';
     document.getElementById('e-file').value = '';
     document.getElementById('e-file-chosen').classList.add('hidden');
@@ -1265,7 +1319,6 @@
     var assignee   = assigneeArr.join(', ');
     var assignDate = document.getElementById('e-assign-date').value;
     var deadline   = document.getElementById('e-deadline').value;
-    var status     = document.getElementById('e-status').value;
     var brief      = document.getElementById('e-brief').value.trim();
     var fileInput  = document.getElementById('e-file');
 
@@ -1283,30 +1336,28 @@
 
     closeEditModal();
     showToast('✓ Task "'+company+'" aggiornato','success');
-    saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl)
+    saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, brief, driveUrl)
       .then(function() { refreshCurrentView(); })
       .catch(function(e) { showError('Aggiornamento del task "'+company+'" non riuscito: '+e.message+' — controlla il task.', taskRef.id, company); });
   }
 
-  async function saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, status, brief, driveUrl) {
+  async function saveEditBackground(taskRef, company, assignee, assigneeArr, assignDate, deadline, brief, driveUrl) {
     var sheetData = await api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/Tasks!A:K');
     var rows = sheetData.values || [];
     var rowIndex = -1;
     for (var i = 1; i < rows.length; i++) { if (rows[i][0] === taskRef.id) { rowIndex = i + 1; break; } }
     if (rowIndex === -1) throw new Error('Task non trovato nel foglio');
 
-    var COLOR_PAIRS = { 'Da fare':{'assign':'11','deadline':'11'}, 'In lavoro':{'assign':'5','deadline':'11'}, 'Completato':{'assign':'8','deadline':'10'} };
-    var colors = COLOR_PAIRS[status] || COLOR_PAIRS['Da fare'];
-    var desc = 'Assegnatari: '+assigneeArr.map(nameOf).join(', ')+'\n\nBrief:\n'+brief+(driveUrl?'\n\nDrive:\n'+driveUrl:'')+(taskRef.docUrl?'\n\nDoc:\n'+taskRef.docUrl:'');
-    var range = 'Tasks!B'+rowIndex+':I'+rowIndex;
+    // Status (col I) is intentionally NOT written here — it's per-assignee JSON,
+    // owned by changeStatus() and the backend. Touching it from the edit modal
+    // would clobber other people's slots.
+    var range = 'Tasks!B'+rowIndex+':H'+rowIndex;
     var jobs = [
       api('https://sheets.googleapis.com/v4/spreadsheets/'+SHEET_ID+'/values/'+encodeURIComponent(range)+'?valueInputOption=RAW', {
-        method:'PUT', body:{ values:[[company, assignee, assignDate, deadline, brief, driveUrl, taskRef.docUrl||'', status]] }
+        method:'PUT', body:{ values:[[company, assignee, assignDate, deadline, brief, driveUrl, taskRef.docUrl||'']] }
       })
     ];
     if (taskRef.docUrl) jobs.push(updateDocContent(taskRef.docUrl, company, assignee, assignDate, deadline, brief).catch(function(e){ console.warn('Doc update skipped:', e.message); }));
-    if (taskRef.assignEventId) jobs.push(api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+taskRef.assignEventId, { method:'PATCH', body:{ summary:company, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, description:desc, colorId:colors.assign } }).catch(function(e){ console.warn('Assign event patch skipped:', e.message); }));
-    if (taskRef.deadlineEventId) jobs.push(api('https://www.googleapis.com/calendar/v3/calendars/primary/events/'+taskRef.deadlineEventId, { method:'PATCH', body:{ summary:'⚠️ DEADLINE - '+company, start:{date:deadline}, end:{date:addOneDay(deadline)}, description:desc, colorId:colors.deadline } }).catch(function(e){ console.warn('Deadline event patch skipped:', e.message); }));
     await Promise.all(jobs);
   }
 
@@ -1315,19 +1366,11 @@
   async function createTask(data) {
     var company=data.company, assignees=data.assignees, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
     var assigneeStr = assignees.join(', ');
-    var namesStr = assignees.map(nameOf).join(', ');
     var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] } });
     var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
-    var desc='Assegnatari: '+namesStr+'\n\nBrief:\n'+brief+(driveUrl?'\n\nCartella Drive:\n'+driveUrl:'')+'\n\nGoogle Doc Brief:\n'+docUrl;
-    // brief insert + both calendar events run in parallel (all only need docId)
-    var res = await Promise.all([
-      api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } }),
-      api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:company, description:desc, start:{date:assignDate}, end:{date:addOneDay(assignDate)}, colorId:'11' } }),
-      api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method:'POST', body:{ summary:'⚠️ DEADLINE - '+company, description:desc, start:{date:deadline}, end:{date:addOneDay(deadline)}, colorId:'11' } })
-    ]);
-    var aEv = res[1], dEv = res[2];
+    await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
     var taskId=Date.now().toString();
-    await sheetsAppend('Tasks!A:L', [[taskId,company,assigneeStr,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare',aEv.id,dEv.id,new Date().toISOString()]]);
+    await sheetsAppend('Tasks!A:L', [[taskId,company,assigneeStr,assignDate,deadline,brief,driveUrl||'',docUrl,'Da fare','','',new Date().toISOString()]]);
     return taskId;
   }
 
@@ -1344,7 +1387,6 @@
     await gasCall('updateStatus', { taskId: taskId, status: newStatus });
   }
 
-  function addOneDay(dateStr) { var d=new Date(dateStr+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+1); return d.toISOString().split('T')[0]; }
   function esc(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function fmt(d)  { if (!d) return '—'; var p=d.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d; }
   function days(s) { if (!s) return null; var d=new Date(s+'T00:00:00'),n=new Date(); n.setHours(0,0,0,0); return Math.round((d-n)/86400000); }
@@ -1428,7 +1470,7 @@
 
   function switchView(v) {
     _currentView = v;
-    ['manager','employee','team','calendar','overview','search'].forEach(function(name) {
+    ['manager','employee','calendar','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
     });
@@ -1437,7 +1479,6 @@
       items[i].classList.toggle('active', items[i].dataset.view === v);
     }
     if (v === 'employee') loadMyTasks();
-    if (v === 'team') loadTeamTasks();
     if (v === 'calendar') loadCalendar();
     if (v === 'overview') loadOverview();
     if (v === 'search') loadSearch();
@@ -1632,9 +1673,9 @@
       container.appendChild(grid);
     }
     if (completed.length) {
-      var sep=document.createElement('div'); sep.className='completed-sep';
+      var sep=document.createElement('div'); sep.className='completed-sep closed';
       sep.innerHTML='Completati ('+completed.length+')<svg class="c-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>';
-      var cgrid=document.createElement('div'); cgrid.className='tasks-grid';
+      var cgrid=document.createElement('div'); cgrid.className='tasks-grid hidden';
       completed.forEach(function(t){ cgrid.appendChild(buildTaskCard(t)); });
       sep.addEventListener('click', function() {
         var closing = !cgrid.classList.contains('hidden');
@@ -1646,11 +1687,16 @@
     }
   }
 
+  var _viewLoaded = { employee: false, overview: false };
+
   async function loadMyTasks() {
     var c = document.getElementById('task-sections');
-    c.innerHTML = '<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task...</div></div>';
+    if (!_viewLoaded.employee) {
+      c.innerHTML = '<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task...</div></div>';
+    }
     try {
       var tasks = await getMyTasks();
+      _viewLoaded.employee = true;
       c.innerHTML = '';
       if (!tasks.length) {
         c.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task assegnato a te</div><div class="es-sub">Quando un task viene assegnato a te, comparirà qui.</div></div>';
@@ -1658,24 +1704,10 @@
       }
       renderTaskList(c, tasks);
     } catch(e) {
-      c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Errore</div><div class="es-sub">'+esc(e.message)+'</div></div>';
-    }
-  }
-
-  async function loadTeamTasks() {
-    var c = document.getElementById('team-sections');
-    c.innerHTML = '<div class="empty-state"><div class="es-icon">⏳</div><div class="es-title">Caricamento task team...</div></div>';
-    try {
-      var all = await getAllTasks();
-      var team = all.filter(function(t){ return !isAssignedTo(t, userEmail); });
-      c.innerHTML = '';
-      if (!team.length) {
-        c.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><div class="es-title">Nessun task nel team</div></div>';
-        return;
+      // On silent refresh after a successful first load, keep the existing UI on transient errors.
+      if (!_viewLoaded.employee) {
+        c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Errore</div><div class="es-sub">'+esc(e.message)+'</div></div>';
       }
-      renderTaskList(c, team);
-    } catch(e) {
-      c.innerHTML = '<div class="empty-state"><div class="es-icon">⚠️</div><div class="es-title">Errore</div><div class="es-sub">'+esc(e.message)+'</div></div>';
     }
   }
 
@@ -1686,9 +1718,12 @@
   async function loadOverview() {
     var statsEl = document.getElementById('overview-stats');
     var listEl  = document.getElementById('overview-tasks');
-    statsEl.innerHTML = ''; listEl.innerHTML = '<div class="ov-empty">⏳ Caricamento...</div>';
+    if (!_viewLoaded.overview) {
+      statsEl.innerHTML = ''; listEl.innerHTML = '<div class="ov-empty">⏳ Caricamento...</div>';
+    }
     try {
       var all = userRole === 'manager' ? await getAllTasks() : await getMyTasks();
+      _viewLoaded.overview = true;
       var open = all.filter(function(t){ return t.status !== 'Completato'; });
       var todo = open.filter(function(t){ return t.status === 'Da fare'; });
       var prog = open.filter(function(t){ return t.status === 'In lavoro'; });
@@ -1706,7 +1741,9 @@
       _overviewData = { open: open, todo: todo, prog: prog, overdue: overdue };
       renderOverview();
     } catch(e) {
-      listEl.innerHTML = '<div class="ov-empty">⚠️ '+esc(e.message)+'</div>';
+      if (!_viewLoaded.overview) {
+        listEl.innerHTML = '<div class="ov-empty">⚠️ '+esc(e.message)+'</div>';
+      }
     }
   }
 
@@ -1817,14 +1854,35 @@
     var pencilBtn=userRole==='manager'?'<button class="btn-pencil" onclick="openEditModal(_taskCache[\''+esc(task.id)+'\'])" title="Modifica task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>':'';
     var delBtn=userRole==='manager'?'<button id="del-'+esc(task.id)+'" class="btn-delete" onclick="deleteTask(\''+esc(task.id)+'\')">Elimina</button>':'';
     var errBadge=_errors[task.id]?'<button class="err-badge" onclick="showTaskError(\''+esc(task.id)+'\')" title="Errore di sincronizzazione — tocca per i dettagli">⚠️</button>':'';
-    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div class="tc-hd-right">'+errBadge+pencilBtn+'</div></div>'+(userRole==='manager'?'<div class="tc-assignee-row" style="font-size:12px;color:var(--text-3);margin-bottom:6px;">Assegnatari: '+esc(assigneeNames(task))+'</div>':'')+'<p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+'<div class="tc-status-row"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value,this)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select>'+delBtn+'</div>';
+
+    // Per-person status dots (manager view only — employees see only their own status)
+    var dotsHtml = '';
+    if (userRole === 'manager') {
+      var emails = taskAssignees(task);
+      if (emails.length) {
+        dotsHtml = '<div class="tc-assignee-status">' + emails.map(function(em) {
+          var s = (task.statusMap && task.statusMap[em.toLowerCase()]) || 'Da fare';
+          return '<span class="aslot"><span class="s-dot sd-'+(SK[s]||'todo')+'"></span>'+esc(nameOf(em))+'</span>';
+        }).join('') + '</div>';
+      }
+    }
+
+    // Status control: select if I'm assigned (employee or manager-as-assignee), read-only pill otherwise
+    var amAssignee = isAssignedTo(task, userEmail);
+    var statusHtml;
+    if (amAssignee) {
+      statusHtml = '<span class="tc-status-wrap tsel-'+key+'"><select class="tc-status-sel tsel-'+key+'" onchange="changeStatus(\''+esc(task.id)+'\',this.value,this)"><option value="Da fare"'+(task.status==='Da fare'?' selected':'')+'>Da fare</option><option value="In lavoro"'+(task.status==='In lavoro'?' selected':'')+'>In lavoro</option><option value="Completato"'+(task.status==='Completato'?' selected':'')+'>Completato</option></select><svg class="tc-status-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg></span>';
+    } else {
+      statusHtml = '<span class="status-pill sp-'+key+'"><span class="s-dot"></span>'+esc(task.status)+'</span>';
+    }
+
+    card.innerHTML='<div class="tc-hd"><div><div class="tc-company">'+esc(task.company)+'</div><div class="tc-assigned"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Assegnato '+esc(fmt(task.assignDate))+'</div></div><div class="tc-hd-right">'+errBadge+pencilBtn+'</div></div><p class="tc-brief">'+esc(brief)+'</p><div class="tc-deadline'+(overdue?' overdue':'')+'"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Deadline '+esc(dlMsg)+'</div>'+(links?'<div class="tc-links">'+links+'</div>':'')+dotsHtml+'<div class="tc-status-row">'+statusHtml+delBtn+'</div>';
     return card;
   }
 
   function refreshCurrentView() {
     if (!accessToken) return;
     if (_currentView === 'employee') loadMyTasks();
-    else if (_currentView === 'team') loadTeamTasks();
     else if (_currentView === 'calendar') loadCalendar();
     else if (_currentView === 'overview') loadOverview();
     else if (_currentView === 'search') loadSearch();
@@ -2023,19 +2081,38 @@
     }
   });
 
+  function _applyStatusClass(selEl, status) {
+    if (!selEl) return;
+    var k = SK[status] || 'todo';
+    selEl.className = 'tc-status-sel tsel-' + k;
+    if (selEl.parentElement && selEl.parentElement.classList.contains('tc-status-wrap')) {
+      selEl.parentElement.className = 'tc-status-wrap tsel-' + k;
+    }
+  }
   function changeStatus(taskId, newStatus, selEl) {
     var task = _taskCache[taskId];
     var prev = task ? task.status : newStatus;
-    // optimistic — update the UI instantly
-    if (task) task.status = newStatus;
-    if (selEl) selEl.className = 'tc-status-sel tsel-' + (SK[newStatus] || 'todo');
+    var meKey = (userEmail || '').toLowerCase();
+    var prevMine = (task && task.statusMap) ? task.statusMap[meKey] : prev;
+    // optimistic — update the UI instantly. `status` here is "what the caller sees":
+    // the caller is necessarily an assignee (otherwise the select isn't rendered),
+    // so updating their own slot is the right semantics.
+    if (task) {
+      task.status = newStatus;
+      task.statusMap = task.statusMap || {};
+      task.statusMap[meKey] = newStatus;
+    }
+    _applyStatusClass(selEl, newStatus);
     showToast('✓ Stato aggiornato: ' + newStatus, 'success');
-    // background sync
     updateTaskStatus(taskId, newStatus).then(function() {
       refreshCurrentView();
     }).catch(function(e) {
-      if (task) task.status = prev;
-      if (selEl) { selEl.value = prev; selEl.className = 'tc-status-sel tsel-' + (SK[prev] || 'todo'); }
+      if (task) {
+        task.status = prev;
+        if (task.statusMap) task.statusMap[meKey] = prevMine;
+      }
+      if (selEl) selEl.value = prev;
+      _applyStatusClass(selEl, prev);
       showError('Stato del task "' + (task ? task.company : taskId) + '" NON salvato: ' + e.message + ' — controlla lo stato del task.', taskId, (task ? task.company : ''));
     });
   }

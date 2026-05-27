@@ -26,7 +26,7 @@ TOKEN_FILE = ROOT / 'token.json'
 
 FILES = [
     ('Code.gs',         'Code',       'SERVER_JS'),
-    ('Index.html',      'Index',      'HTML'),
+    ('index.html',      'Index',      'HTML'),
     ('appsscript.json', 'appsscript', 'JSON'),
 ]
 
