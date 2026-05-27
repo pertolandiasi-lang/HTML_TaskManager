@@ -205,6 +205,24 @@
       grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
       gap: 16px;
     }
+    /* Manager has 4 tiles — force a 2×2 grid on every breakpoint so it's
+       always "2 next to each other and 2 below". */
+    .home-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+
+    /* Mobile: home page fits the viewport — no scrolling past the last tile,
+       header always visible. Pull-to-refresh keeps working (it uses touch
+       events, not scroll). */
+    @media (max-width: 768px) {
+      body.is-home { overflow: hidden; }
+      body.is-home .main { padding-top: 20px; padding-bottom: 20px; }
+      body.is-home .home-hd { margin-bottom: 18px; }
+      body.is-home .home-greet { font-size: 22px; }
+      body.is-home .home-tile { min-height: 132px; padding: 18px 14px; gap: 10px; }
+      body.is-home .home-tile-icon { width: 46px; height: 46px; border-radius: 12px; }
+      body.is-home .home-tile-icon svg { width: 22px; height: 22px; }
+      body.is-home .home-tile-label { font-size: 15px; }
+      body.is-home .home-tile-desc { font-size: 12px; }
+    }
     .home-tile {
       position: relative;
       background: var(--card);
@@ -1892,6 +1910,7 @@
       }
     }
     _currentView = v;
+    document.body.classList.toggle('is-home', v === 'home');
     ['home','manager','employee','calendar','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
@@ -1930,7 +1949,11 @@
     tiles.push({ v:'employee', icon:'user',     label:'I miei task', desc:'Task assegnati a te' });
     tiles.push({ v:'calendar', icon:'calendar', label:'Calendario',  desc:'Task per data di scadenza' });
     tiles.push({ v:'overview', icon:'chart',    label:'Overview',    desc:'Riepilogo task aperti' });
-    document.getElementById('home-grid').innerHTML = tiles.map(function(t) {
+    var hg = document.getElementById('home-grid');
+    // Force a 2×2 grid for managers (4 tiles); employees keep the auto-fit
+    // (3 tiles flow naturally).
+    hg.classList.toggle('cols-2', tiles.length === 4);
+    hg.innerHTML = tiles.map(function(t) {
       return '<button class="home-tile" onclick="navTo(\''+t.v+'\')">'
         + '<span class="home-tile-icon">'+HOME_ICONS[t.icon]+'</span>'
         + '<div><div class="home-tile-label">'+esc(t.label)+'</div><div class="home-tile-desc">'+esc(t.desc)+'</div></div>'
