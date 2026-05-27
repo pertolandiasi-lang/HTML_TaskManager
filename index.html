@@ -205,15 +205,34 @@
        always "2 next to each other and 2 below". */
     .home-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 
-    /* Mobile: home page fits the viewport — no scrolling past the last tile,
-       header always visible. Pull-to-refresh keeps working (it uses touch
-       events, not scroll). */
+    /* Mobile: home page fits the viewport exactly — header stays put, no
+       empty space below the tiles. Tiles stretch to fill remaining height
+       so 4 (manager) or 3 (employee) cards are equal and use all the space.
+       Pull-to-refresh keeps working (touch event, not scroll). */
     @media (max-width: 768px) {
-      body.is-home { overflow: hidden; }
-      body.is-home .main { padding-top: 20px; padding-bottom: 20px; }
-      body.is-home .home-hd { margin-bottom: 18px; }
+      body.is-home { overflow: hidden; height: 100dvh; }
+      body.is-home .main {
+        height: calc(100dvh - 72px); /* viewport minus header */
+        padding-top: 20px; padding-bottom: 20px;
+        display: flex; flex-direction: column;
+      }
+      body.is-home #view-home {
+        flex: 1; min-height: 0;
+        display: flex; flex-direction: column;
+      }
+      body.is-home .home-hd { flex-shrink: 0; margin-bottom: 18px; }
       body.is-home .home-greet { font-size: 22px; }
-      body.is-home .home-tile { min-height: 132px; padding: 18px 14px; gap: 10px; }
+      body.is-home .home-grid {
+        flex: 1; min-height: 0;
+        grid-template-rows: 1fr 1fr 1fr; /* employee: 3 equal rows */
+      }
+      body.is-home .home-grid.cols-2 {
+        grid-template-rows: 1fr 1fr; /* manager: 2 equal rows (2×2) */
+      }
+      body.is-home .home-tile {
+        min-height: 0; /* allow grid row sizing to take over */
+        padding: 18px 16px; gap: 10px;
+      }
       body.is-home .home-tile-icon { width: 46px; height: 46px; border-radius: 12px; }
       body.is-home .home-tile-icon svg { width: 22px; height: 22px; }
       body.is-home .home-tile-label { font-size: 15px; }
