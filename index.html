@@ -179,19 +179,22 @@
     .day-section.today    .day-section-hd { color: var(--primary-light); }
     .day-section.overdue  .day-section-hd { color: var(--status-todo); }
     .task-card.dragging {
-      background: linear-gradient(140deg, var(--card) 0%, rgba(94,23,235,.18) 100%);
-      border-color: rgba(174,139,245,.55);
-      box-shadow: 0 22px 56px rgba(0,0,0,.55), 0 0 0 1px rgba(174,139,245,.35);
+      background: linear-gradient(140deg, var(--card) 0%, rgba(94,23,235,.20) 100%);
+      border-color: rgba(174,139,245,.6);
+      box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(174,139,245,.4);
       z-index: 100; position: relative;
       cursor: grabbing !important;
-      will-change: transform;
-      transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; /* no transform transition — finger tracking must be instant */
+      will-change: transform, scale;
+      scale: 1.035;
+      /* transform (translate) must update instantly to follow the finger; the
+         lift effect uses `scale` separately so it can be animated smoothly. */
+      transition: scale .16s cubic-bezier(.2,.9,.3,1), background .2s ease, border-color .2s ease, box-shadow .2s ease;
     }
     .task-card.drag-deny { animation: dragShake .25s ease; }
-    @keyframes dragShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    @keyframes dragShake { 0%,100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
 
     .task-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px;
-      transition: transform .28s cubic-bezier(.2,.9,.3,1), border-color .15s, box-shadow .15s, background .2s;
+      transition: transform .26s cubic-bezier(.2,.9,.3,1), border-color .15s, box-shadow .15s, background .2s, scale .16s ease;
       -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
       -webkit-touch-callout: none; touch-action: pan-y; cursor: grab; }
     .task-card:hover { border-color: rgba(174,139,245,.22); box-shadow: 0 0 0 1px rgba(174,139,245,.08); }
@@ -1874,52 +1877,64 @@
   // shows an error toast explaining why.
   var INTERACTIVE_SEL = 'button, select, a, input, textarea, .status-pill, .tc-status-wrap, .tc-status-sel, .tc-status-arrow, .tc-link';
 
+  // Global flag so pull-to-refresh knows to stand down while a card is being
+  // dragged. window-scoped because PTR lives in a separate handler block.
+  window._cardDragging = false;
+
   function attachReorderHandlers(card, dateKey) {
     var pressTimer = null;
     var dragging = false;
     var startX = 0, startY = 0;          // pointer at press-start
-    var pointerCardOffset = 0;           // pointer Y - card's natural top, recorded at drag start
+    var pointerCardOffset = 0;           // pointer Y - card's natural top at drag start
+    var cardNaturalTop = 0;              // cached natural top — recomputed only on swap
     var lastDenyTarget = null;
     var suppressClickUntil = 0;
-    var SCALE = 1.03;                    // dragged-card zoom
+    var lastTarget = null;               // card the pointer was last over
+    var swapBlockedUntil = 0;            // short cooldown after a swap so FLIP can settle
 
     function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
-    // Measure the card's "natural" viewport top by temporarily clearing the
-    // inline transform. Restored by the caller.
-    function naturalTop() {
+    function recomputeNaturalTop() {
       var prev = card.style.transform;
       card.style.transform = '';
-      var t = card.getBoundingClientRect().top;
+      cardNaturalTop = card.getBoundingClientRect().top;
       card.style.transform = prev;
-      return t;
     }
 
     function applyDrag(y) {
-      // Place the card so the pointer keeps the same offset from its top.
-      var translateY = y - pointerCardOffset - naturalTop();
-      card.style.transform = 'translate3d(0,' + translateY + 'px,0) scale(' + SCALE + ')';
+      // Visual position = naturalTop + translateY; we want it = y - pointerCardOffset.
+      var translateY = y - pointerCardOffset - cardNaturalTop;
+      card.style.transform = 'translate3d(0,' + translateY + 'px,0)';
     }
 
     function beginDrag() {
       dragging = true;
-      pointerCardOffset = startY - card.getBoundingClientRect().top;
+      window._cardDragging = true;
+      // Make sure the pull-to-refresh pill is hidden and inactive.
+      try {
+        if (typeof _ptr !== 'undefined') { _ptr.active = false; _ptr.lastDy = 0; }
+        if (_ptrPill) _ptrPill.classList.remove('show');
+      } catch(e) {}
+      recomputeNaturalTop();
+      pointerCardOffset = startY - cardNaturalTop;
       card.classList.add('dragging');
       applyDrag(startY);
-      if (navigator.vibrate) navigator.vibrate(35);
+      if (navigator.vibrate) navigator.vibrate(30);
     }
 
     function startPress(x, y, isTouch) {
       startX = x; startY = y;
       lastDenyTarget = null;
+      lastTarget = null;
+      swapBlockedUntil = 0;
       cancelPress();
-      // Touch needs the 450ms hold so taps/scrolls aren't hijacked.
+      // Touch needs a longer hold so taps/scrolls aren't hijacked.
       // Mouse uses a shorter hold so a normal click still works.
-      pressTimer = setTimeout(beginDrag, isTouch ? 420 : 160);
+      pressTimer = setTimeout(beginDrag, isTouch ? 400 : 140);
     }
 
     // FLIP — animate the siblings smoothly into their new positions after a
-    // DOM reorder. The dragged card itself is left to applyDrag().
+    // DOM reorder. The dragged card is excluded (its position is set by JS).
     function flipSiblings(grid, doReorder) {
       var siblings = [];
       for (var i = 0; i < grid.children.length; i++) {
@@ -1928,7 +1943,6 @@
       }
       var firstTops = siblings.map(function(c) { return c.getBoundingClientRect().top; });
       doReorder();
-      // Invert
       for (var i = 0; i < siblings.length; i++) {
         var c = siblings[i];
         var delta = firstTops[i] - c.getBoundingClientRect().top;
@@ -1936,55 +1950,63 @@
         c.style.transition = 'none';
         c.style.transform = 'translate3d(0,' + delta + 'px,0)';
       }
-      // Play (next frame so the "instant" placement settles)
-      requestAnimationFrame(function() {
-        for (var i = 0; i < siblings.length; i++) {
-          siblings[i].style.transition = '';
-          siblings[i].style.transform = '';
-        }
-      });
+      // Force reflow so the "instant" placement is committed, then animate back.
+      void grid.offsetWidth;
+      for (var i = 0; i < siblings.length; i++) {
+        siblings[i].style.transition = '';
+        siblings[i].style.transform = '';
+      }
     }
 
     function moveDuringPress(x, y) {
       if (!dragging) {
-        // If the user moved significantly before the timer fired, treat it as
-        // a scroll/click drag and cancel the press.
         if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) cancelPress();
         return false;
       }
       applyDrag(y);
 
-      // Find what's under the pointer — temporarily ignore the card so
-      // elementFromPoint returns whatever is beneath it.
+      // Throttle swap re-evaluation while a prior FLIP is settling.
+      if (Date.now() < swapBlockedUntil) return true;
+
       var prevPE = card.style.pointerEvents;
       card.style.pointerEvents = 'none';
       var under = document.elementFromPoint(x, y);
       card.style.pointerEvents = prevPE;
 
       var targetCard = under && under.closest && under.closest('.task-card');
-      if (!targetCard || targetCard === card) return true;
+      if (!targetCard || targetCard === card) { lastTarget = null; return true; }
       var targetSection = targetCard.closest('.day-section');
       var targetDateKey = targetSection && targetSection.dataset.dateKey;
 
-      if (targetDateKey === dateKey) {
-        var grid = targetCard.parentNode;
-        var rect = targetCard.getBoundingClientRect();
-        var insertBefore = y < rect.top + rect.height / 2;
-        flipSiblings(grid, function() {
-          if (insertBefore) grid.insertBefore(card, targetCard);
-          else grid.insertBefore(card, targetCard.nextSibling);
-        });
-        // Re-apply drag with the card's NEW natural position so it stays
-        // exactly under the pointer (no jump).
-        applyDrag(y);
-      } else if (lastDenyTarget !== targetDateKey) {
-        // Crossing into another day — show the rule once per target section.
-        lastDenyTarget = targetDateKey;
-        card.classList.remove('drag-deny');
-        void card.offsetWidth; // force reflow so the animation re-triggers
-        card.classList.add('drag-deny');
-        showReorderError();
+      if (targetDateKey !== dateKey) {
+        if (lastDenyTarget !== targetDateKey) {
+          lastDenyTarget = targetDateKey;
+          card.classList.remove('drag-deny');
+          void card.offsetWidth;
+          card.classList.add('drag-deny');
+          showReorderError();
+        }
+        return true;
       }
+      lastDenyTarget = null;
+
+      var grid = targetCard.parentNode;
+      var rect = targetCard.getBoundingClientRect();
+      var insertBefore = y < rect.top + rect.height / 2;
+      var desired = insertBefore ? targetCard : targetCard.nextSibling;
+
+      // Skip if already in the desired position, or desired equals the dragged
+      // card itself (would be a self-swap no-op).
+      if (desired === card || card.nextSibling === desired) {
+        lastTarget = targetCard;
+        return true;
+      }
+
+      flipSiblings(grid, function() { grid.insertBefore(card, desired); });
+      recomputeNaturalTop();
+      applyDrag(y);
+      lastTarget = targetCard;
+      swapBlockedUntil = Date.now() + 90; // brief cooldown so FLIP settles
       return true;
     }
 
@@ -1992,11 +2014,12 @@
       cancelPress();
       if (!dragging) return;
       dragging = false;
+      window._cardDragging = false;
       // Smooth settle: animate transform back to 0 instead of snapping.
-      card.style.transition = 'transform .22s cubic-bezier(.2,.9,.3,1), background .25s, border-color .25s, box-shadow .25s';
+      card.style.transition = 'transform .24s cubic-bezier(.2,.9,.3,1)';
       card.style.transform = '';
       card.classList.remove('dragging');
-      setTimeout(function() { card.style.transition = ''; }, 260);
+      setTimeout(function() { card.style.transition = ''; }, 280);
       suppressClickUntil = Date.now() + 350;
       persistSectionOrder(card.parentNode);
     }
@@ -2423,11 +2446,17 @@
   var _ptrPill = document.getElementById('ptr-pill');
 
   document.addEventListener('touchstart', function(e) {
+    if (window._cardDragging) { _ptr.active = false; _ptr.lastDy = 0; return; }
     _ptr.y0 = e.touches[0].clientY;
     _ptr.lastDy = 0; _ptr.active = false;
   }, { passive: true });
 
   document.addEventListener('touchmove', function(e) {
+    if (window._cardDragging) {
+      // Suppress any pill that crept in before the long-press fired.
+      if (_ptr.active) { _ptr.active = false; _ptr.lastDy = 0; _ptrPill.classList.remove('show'); }
+      return;
+    }
     if (window.scrollY > 10) return;
     var dy = e.touches[0].clientY - _ptr.y0;
     if (dy > 0) {
@@ -2440,6 +2469,7 @@
   }, { passive: true });
 
   document.addEventListener('touchend', function() {
+    if (window._cardDragging) { _ptr.active = false; _ptr.lastDy = 0; return; }
     if (!_ptr.active) return;
     var triggered = _ptr.lastDy >= _ptr.threshold && accessToken;
     _ptr.active = false; _ptr.lastDy = 0;
