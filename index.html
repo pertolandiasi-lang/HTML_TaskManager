@@ -98,6 +98,20 @@
     .main { max-width: 1200px; margin: 0 auto; padding: 32px 20px 60px; }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px 24px; }
 
+    /* ── HOME / WELCOME ─────────────────────────────────────── */
+    .brand { cursor: pointer; }
+    .home-hd { margin-bottom: 28px; }
+    .home-greet { font-size: 26px; font-weight: 700; }
+    .home-sub { font-size: 14px; color: var(--text-2); margin-top: 4px; }
+    .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+    .home-tile { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px 18px; cursor: pointer; transition: border-color .15s, transform .1s, background .15s; display: flex; flex-direction: column; gap: 14px; text-align: left; color: var(--text); font-family: inherit; }
+    .home-tile:hover { border-color: var(--primary-light); background: var(--card-2); }
+    .home-tile:active { transform: scale(.98); }
+    .home-tile-icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(174,139,245,.14); color: var(--primary-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .home-tile-icon svg { width: 20px; height: 20px; }
+    .home-tile-label { font-size: 15px; font-weight: 600; }
+    .home-tile-desc  { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+
     /* ── MANAGER GRID ────────────────────────────────────────── */
     .manager-grid { display: grid; grid-template-columns: 1fr 268px; gap: 20px; align-items: start; }
     @media (max-width: 860px) { .manager-grid { grid-template-columns: 1fr; } }
@@ -157,6 +171,16 @@
     .c-arrow { width: 13px; height: 13px; flex-shrink: 0; transition: transform .2s; vertical-align: middle; margin-left: 3px; }
     .completed-sep.closed .c-arrow { transform: rotate(-90deg); }
     .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+    /* ── DAY-GROUPED TASKS (My Tasks view) ─────────────────── */
+    .day-section { margin-bottom: 28px; }
+    .day-section-hd { font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .5px; margin: 0 0 12px 4px; display: flex; align-items: center; gap: 8px; }
+    .day-section-count { font-size: 11px; color: var(--text-3); background: var(--card-2); padding: 1px 8px; border-radius: 9999px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .day-section.today    .day-section-hd { color: var(--primary-light); }
+    .day-section.overdue  .day-section-hd { color: var(--status-todo); }
+    .task-card.dragging { opacity: .55; transform: scale(1.02); box-shadow: 0 12px 32px rgba(0,0,0,.55); z-index: 100; position: relative; transition: transform .12s, box-shadow .12s, opacity .12s; }
+    .task-card.drag-deny { animation: dragShake .25s ease; }
+    @keyframes dragShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
     .task-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .15s, box-shadow .15s; }
     .task-card:hover { border-color: rgba(174,139,245,.22); box-shadow: 0 0 0 1px rgba(174,139,245,.08); }
@@ -267,6 +291,8 @@
     }
     .toast.success { background: #15301c; border: 1px solid rgba(63,185,80,.6); color: #d7f5de; }
     .toast.error   { border-top: 3px solid var(--status-todo); }
+    .toast.loading { background: rgba(255,255,255,.04); border: 1px dashed var(--text-3); color: var(--text-2); display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .toast-spin { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.12); border-top-color: var(--primary-light); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
     @keyframes toastPop {
       from { transform: translate(-50%, -50%) scale(.85); opacity: 0; }
       to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
@@ -333,7 +359,7 @@
     @keyframes ubSlideUp { from { transform: translateY(120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .ub-msg { flex: 1; }
     .ub-btn {
-      background: var(--primary-fg); color: var(--primary-light);
+      background: var(--primary-fg); color: #000;
       border: none; padding: 8px 14px; border-radius: 9px;
       font-weight: 700; cursor: pointer; font-family: inherit; font-size: 13px;
     }
@@ -551,7 +577,7 @@
 <div id="app" class="hidden">
   <header class="header">
     <div class="header-inner">
-      <div class="brand">
+      <div class="brand" onclick="navTo('home')" title="Home">
         <div class="brand-logo">
           <span class="bl-html">HTML</span>
           <svg class="bl-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -595,6 +621,14 @@
       <div class="unauth"><div class="unauth-icon">🔒</div><h2>Accesso non autorizzato</h2><p>Il tuo account non è presente nel team. Contatta il responsabile per essere aggiunto.</p></div>
     </div>
 
+    <div id="view-home" class="hidden">
+      <div class="home-hd">
+        <div class="home-greet">Benvenuto/a, <span id="home-name"></span></div>
+        <div class="home-sub">Cosa vuoi fare oggi?</div>
+      </div>
+      <div class="home-grid" id="home-grid"></div>
+    </div>
+
     <div id="view-manager" class="hidden">
       <div class="manager-grid">
         <div class="card">
@@ -628,7 +662,6 @@
               </div>
             </div>
             <div class="form-ft">
-              <span class="form-hint">Salvato su Sheet e Drive</span>
               <button type="submit" id="submit-btn" class="btn-primary"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Crea task</button>
             </div>
           </form>
@@ -853,6 +886,7 @@
 
   const CLIENT_ID = '848444804320-ndpeev8k3bs0o71h7orac09liohr7kmc.apps.googleusercontent.com';
   const SHEET_ID  = '1aUW4iKrUhUQBNISsY2xISgNHlfOc7e6dDjuqVzHgC68';
+  const BRIEF_ROOT = '1qZdcgxj1neycYTj4BmTQhI1SbGklgowc';
   const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxPO690wTE3ntdbZCS2f5CFETLn5JsqSdxlKpQFmfgmkk73lZdNspNQPK4wHdjCdHzX-Q/exec';
   const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
@@ -1112,12 +1146,12 @@
       var dl = new Date(now); dl.setDate(dl.getDate()+5); document.getElementById('f-deadline').value = dl.toISOString().split('T')[0];
       document.getElementById('task-form').addEventListener('submit', handleSubmit);
       await loadTeamDropdown();
-      switchView('manager');
+      switchView('home');
     } else if (userRole === 'employee') {
       roleEl.textContent = 'Dipendente'; roleEl.className = 'role-badge employee';
       document.getElementById('menu-btn').classList.remove('hidden');
       document.querySelector('#nav-menu .nav-item[data-view="manager"]').classList.add('hidden');
-      switchView('employee');
+      switchView('home');
     } else {
       document.getElementById('view-unauth').classList.remove('hidden');
     }
@@ -1155,7 +1189,13 @@
       if (fetchData.error) throw new Error(fetchData.error);
       return fetchData;
     }
-    return _gasCallJsonp(payload);
+    // First JSONP attempt; on timeout (Apps Script cold start), retry once silently.
+    try {
+      return await _gasCallJsonp(payload);
+    } catch (err) {
+      if (/Timeout/i.test(err.message)) return _gasCallJsonp(payload);
+      throw err;
+    }
   }
 
   function _gasCallJsonp(payload) {
@@ -1166,7 +1206,7 @@
       var timer = setTimeout(function() {
         delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
         reject(new Error('Timeout risposta server'));
-      }, 15000);
+      }, 30000);
       window[cbName] = function(data) {
         clearTimeout(timer); delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s);
         if (data.error) reject(new Error(data.error)); else resolve(data);
@@ -1363,10 +1403,25 @@
 
   // ── TASK CREATION ────────────────────────────────────────────────────────────
 
+  // Find or create the 'YYYY-MM' subfolder inside BRIEF_ROOT so briefs stay
+  // organized by assignment month and the root folder doesn't pile up.
+  async function getOrCreateMonthFolder(dateStr) {
+    var ym = (dateStr || new Date().toISOString().slice(0,10)).slice(0,7);
+    var q = "name='"+ym+"' and mimeType='application/vnd.google-apps.folder' and '"+BRIEF_ROOT+"' in parents and trashed=false";
+    var data = await api('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id)&pageSize=1');
+    if (data.files && data.files.length) return data.files[0].id;
+    var created = await api('https://www.googleapis.com/drive/v3/files', {
+      method:'POST',
+      body:{ name: ym, mimeType: 'application/vnd.google-apps.folder', parents: [BRIEF_ROOT] }
+    });
+    return created.id;
+  }
+
   async function createTask(data) {
     var company=data.company, assignees=data.assignees, assignDate=data.assignDate, deadline=data.deadline, brief=data.brief, driveUrl=data.driveUrl;
     var assigneeStr = assignees.join(', ');
-    var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:['1qZdcgxj1neycYTj4BmTQhI1SbGklgowc'] } });
+    var monthFolderId = await getOrCreateMonthFolder(assignDate);
+    var doc = await api('https://www.googleapis.com/drive/v3/files', { method:'POST', body:{ name:'Brief - '+company+' - '+assignDate, mimeType:'application/vnd.google-apps.document', parents:[monthFolderId] } });
     var docId=doc.id, docUrl='https://docs.google.com/document/d/'+docId;
     await api('https://docs.googleapis.com/v1/documents/'+docId+':batchUpdate', { method:'POST', body:{ requests:[{ insertText:{ location:{ index:1 }, text:brief } }] } });
     var taskId=Date.now().toString();
@@ -1392,9 +1447,25 @@
   function days(s) { if (!s) return null; var d=new Date(s+'T00:00:00'),n=new Date(); n.setHours(0,0,0,0); return Math.round((d-n)/86400000); }
 
   var _tt;
-  function showToast(msg, type, duration) { var t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(type||'success'); clearTimeout(_tt); _tt=setTimeout(function(){ t.className='toast hidden'; }, duration||4000); }
+  function showToast(msg, type, duration) {
+    var t = document.getElementById('toast');
+    if (type === 'loading') {
+      t.innerHTML = '<span class="toast-spin"></span><span>' + esc(msg) + '</span>';
+    } else {
+      t.textContent = msg;
+    }
+    t.className = 'toast ' + (type || 'success');
+    clearTimeout(_tt);
+    // 'loading' stays until the caller replaces it with success/error
+    if (type !== 'loading') {
+      _tt = setTimeout(function(){ t.className = 'toast hidden'; }, duration || 4000);
+    }
+  }
+  function hideToast() { var t = document.getElementById('toast'); t.className = 'toast hidden'; clearTimeout(_tt); }
   document.getElementById('toast').addEventListener('click', function() {
-    this.className = 'toast hidden'; clearTimeout(_tt);
+    // Don't let an accidental tap dismiss the in-flight loading toast.
+    if (this.classList.contains('loading')) return;
+    hideToast();
   });
 
   // ── ERROR TRACKING — persists across app restarts ──────────────────────────
@@ -1466,11 +1537,11 @@
     showToast('Ciao ' + firstName + ', hai ' + mine.length + ' ' + word + ':\n' + list, 'success', 9000);
   }
 
-  var _currentView = 'manager';
+  var _currentView = 'home';
 
   function switchView(v) {
     _currentView = v;
-    ['manager','employee','calendar','overview','search'].forEach(function(name) {
+    ['home','manager','employee','calendar','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
     });
@@ -1478,10 +1549,35 @@
     for (var i = 0; i < items.length; i++) {
       items[i].classList.toggle('active', items[i].dataset.view === v);
     }
+    if (v === 'home') renderHome();
     if (v === 'employee') loadMyTasks();
     if (v === 'calendar') loadCalendar();
     if (v === 'overview') loadOverview();
     if (v === 'search') loadSearch();
+  }
+
+  var HOME_ICONS = {
+    plus:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    user:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    chart:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+  };
+  function renderHome() {
+    var first = (userName || '').split(' ')[0] || '';
+    document.getElementById('home-name').textContent = first;
+    var tiles = [];
+    if (userRole === 'manager') tiles.push({ v:'manager',  icon:'plus',     label:'Crea Task',   desc:'Assegna un nuovo brief' });
+    tiles.push({ v:'employee', icon:'user',     label:'I miei task', desc:'Task assegnati a te' });
+    tiles.push({ v:'calendar', icon:'calendar', label:'Calendario',  desc:'Task per data di scadenza' });
+    tiles.push({ v:'overview', icon:'chart',    label:'Overview',    desc:'Riepilogo task aperti' });
+    tiles.push({ v:'search',   icon:'search',   label:'Cerca',       desc:'Trova un task' });
+    document.getElementById('home-grid').innerHTML = tiles.map(function(t) {
+      return '<button class="home-tile" onclick="navTo(\''+t.v+'\')">'
+        + '<span class="home-tile-icon">'+HOME_ICONS[t.icon]+'</span>'
+        + '<div><div class="home-tile-label">'+esc(t.label)+'</div><div class="home-tile-desc">'+esc(t.desc)+'</div></div>'
+        + '</button>';
+    }).join('');
   }
 
   function toggleMenu() {
@@ -1566,11 +1662,12 @@
     }
     var data = { company:company, assignees:assignees, assignDate:assignDate, deadline:deadline, brief:brief, driveUrl:driveUrl };
     resetForm();
-    showToast('✓ Task "'+company+'" in creazione…','success');
+    showToast('Task "'+company+'" in creazione', 'loading');
     createTask(data).then(function() {
       showToast('✓ Task "'+company+'" creato!','success');
       refreshCurrentView();
     }).catch(function(err) {
+      hideToast();
       showError('Creazione del task "'+company+'" non riuscita: '+err.message+' — verifica nella lista task.', null, company);
     });
   }
@@ -1655,23 +1752,95 @@
 
   var SK={ 'Da fare':'todo','In lavoro':'progress','Completato':'done' };
 
+  // ── Personal task order (per user, in localStorage) ─────────────────────
+  function _orderKey() { return 'tf_order_' + (userEmail || ''); }
+  function _loadOrder() {
+    try { return JSON.parse(localStorage.getItem(_orderKey()) || '{}'); }
+    catch(e) { return {}; }
+  }
+  function _saveOrder(map) {
+    try { localStorage.setItem(_orderKey(), JSON.stringify(map)); } catch(e) {}
+  }
+  function _orderOf(task, orderMap) {
+    return orderMap[task.id] !== undefined ? orderMap[task.id] : 9999;
+  }
+
+  var CAL_DOW_SHORT = ['dom','lun','mar','mer','gio','ven','sab'];
+  function _dayLabel(dateKey, todayStr, tomorrowStr) {
+    if (dateKey === '__overdue__') return 'In ritardo';
+    if (dateKey === '__no_deadline__') return 'Senza scadenza';
+    if (dateKey === todayStr) return 'Oggi';
+    if (dateKey === tomorrowStr) return 'Domani';
+    var d = new Date(dateKey + 'T00:00:00');
+    return CAL_DOW_SHORT[d.getDay()] + ' ' + d.getDate() + ' ' + CAL_MON_SHORT[d.getMonth()];
+  }
+
   function renderTaskList(container, tasks) {
     var active = tasks.filter(function(t){ return t.status !== 'Completato'; });
     var completed = tasks.filter(function(t){ return t.status === 'Completato'; });
-    active.sort(function(a,b){
-      if (!a.deadline) return 1; if (!b.deadline) return -1;
-      return a.deadline < b.deadline ? -1 : a.deadline > b.deadline ? 1 : 0;
-    });
+
     if (!active.length && !completed.length) {
       var empty=document.createElement('div'); empty.className='empty-state';
       empty.innerHTML='<div class="es-icon">📭</div><div class="es-title">Nessun task</div>';
       container.appendChild(empty); return;
     }
+
     if (active.length) {
-      var grid=document.createElement('div'); grid.className='tasks-grid';
-      active.forEach(function(t){ grid.appendChild(buildTaskCard(t)); });
-      container.appendChild(grid);
+      var orderMap = _loadOrder();
+      var todayStr = new Date().toISOString().slice(0,10);
+      var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+      var tomorrowStr = tomorrow.toISOString().slice(0,10);
+
+      // Group by deadline date (overdue lumped together at top)
+      var groups = {};
+      active.forEach(function(t) {
+        var k = !t.deadline ? '__no_deadline__'
+              : t.deadline < todayStr ? '__overdue__'
+              : t.deadline;
+        (groups[k] = groups[k] || []).push(t);
+      });
+
+      var dateKeys = Object.keys(groups).sort(function(a, b) {
+        if (a === '__overdue__') return -1;
+        if (b === '__overdue__') return 1;
+        if (a === '__no_deadline__') return 1;
+        if (b === '__no_deadline__') return -1;
+        return a < b ? -1 : 1;
+      });
+
+      dateKeys.forEach(function(dateKey) {
+        var list = groups[dateKey].slice();
+        // Sort by user-defined order, tie-break by creation timestamp (task.id)
+        list.sort(function(a, b) {
+          var oa = _orderOf(a, orderMap), ob = _orderOf(b, orderMap);
+          if (oa !== ob) return oa - ob;
+          return parseInt(a.id, 10) - parseInt(b.id, 10);
+        });
+
+        var section = document.createElement('div');
+        section.className = 'day-section';
+        if (dateKey === '__overdue__') section.classList.add('overdue');
+        else if (dateKey === todayStr) section.classList.add('today');
+        section.dataset.dateKey = dateKey;
+
+        var hd = document.createElement('div');
+        hd.className = 'day-section-hd';
+        hd.innerHTML = esc(_dayLabel(dateKey, todayStr, tomorrowStr)) + '<span class="day-section-count">' + list.length + '</span>';
+        section.appendChild(hd);
+
+        var grid = document.createElement('div');
+        grid.className = 'tasks-grid';
+        list.forEach(function(t) {
+          var card = buildTaskCard(t);
+          card.dataset.taskId = t.id;
+          attachReorderHandlers(card, dateKey);
+          grid.appendChild(card);
+        });
+        section.appendChild(grid);
+        container.appendChild(section);
+      });
     }
+
     if (completed.length) {
       var sep=document.createElement('div'); sep.className='completed-sep closed';
       sep.innerHTML='Completati ('+completed.length+')<svg class="c-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>';
@@ -1685,6 +1854,103 @@
       container.appendChild(sep);
       container.appendChild(cgrid);
     }
+  }
+
+  // ── Long-press touch reorder ───────────────────────────────────────────
+  // Reordering is allowed only WITHIN the same day section, because the
+  // deadline-date order has priority. Dragging into another day shakes the
+  // card and shows an error toast explaining why.
+  function attachReorderHandlers(card, dateKey) {
+    var pressTimer = null;
+    var dragging = false;
+    var startX = 0, startY = 0;
+    var lastDenyTarget = null;
+
+    function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      card.classList.remove('dragging');
+      persistSectionOrder(card.parentNode);
+    }
+
+    card.addEventListener('touchstart', function(e) {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      lastDenyTarget = null;
+      pressTimer = setTimeout(function() {
+        dragging = true;
+        card.classList.add('dragging');
+        if (navigator.vibrate) navigator.vibrate(40);
+      }, 500);
+    }, { passive: true });
+
+    card.addEventListener('touchmove', function(e) {
+      if (!dragging) {
+        // If the user is just scrolling, cancel the press.
+        var dx = e.touches[0].clientX - startX;
+        var dy = e.touches[0].clientY - startY;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) cancelPress();
+        return;
+      }
+      e.preventDefault(); // suppress scroll while actively dragging
+      var touch = e.touches[0];
+      // Hide the dragged card briefly so elementFromPoint sees what's beneath
+      var prevVis = card.style.visibility;
+      card.style.visibility = 'hidden';
+      var under = document.elementFromPoint(touch.clientX, touch.clientY);
+      card.style.visibility = prevVis;
+
+      var targetCard = under && under.closest && under.closest('.task-card');
+      if (!targetCard || targetCard === card) return;
+      var targetSection = targetCard.closest('.day-section');
+      var targetDateKey = targetSection && targetSection.dataset.dateKey;
+
+      if (targetDateKey === dateKey) {
+        var grid = targetCard.parentNode;
+        var rect = targetCard.getBoundingClientRect();
+        var insertBefore = touch.clientY < rect.top + rect.height / 2;
+        if (insertBefore) grid.insertBefore(card, targetCard);
+        else grid.insertBefore(card, targetCard.nextSibling);
+      } else if (lastDenyTarget !== targetDateKey) {
+        // Crossing into another day — show the rule once per target section.
+        lastDenyTarget = targetDateKey;
+        card.classList.remove('drag-deny');
+        // force reflow so the animation re-triggers
+        void card.offsetWidth;
+        card.classList.add('drag-deny');
+        showReorderError();
+      }
+    }, { passive: false });
+
+    card.addEventListener('touchend', function() {
+      cancelPress();
+      endDrag();
+    });
+    card.addEventListener('touchcancel', function() {
+      cancelPress();
+      endDrag();
+    });
+  }
+
+  function persistSectionOrder(grid) {
+    if (!grid) return;
+    var orderMap = _loadOrder();
+    var cards = grid.querySelectorAll('.task-card');
+    for (var i = 0; i < cards.length; i++) {
+      var id = cards[i].dataset.taskId;
+      if (id) orderMap[id] = i;
+    }
+    _saveOrder(orderMap);
+  }
+
+  var _reorderErrorAt = 0;
+  function showReorderError() {
+    var now = Date.now();
+    if (now - _reorderErrorAt < 2500) return; // debounce
+    _reorderErrorAt = now;
+    showToast('⚠️ Non puoi spostarlo in un altro giorno — la scadenza ha la priorità', 'error', 3500);
   }
 
   var _viewLoaded = { employee: false, overview: false };
