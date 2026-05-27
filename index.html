@@ -253,25 +253,73 @@
     .file-status { display: block; font-size: 11px; color: var(--text-3); margin-top: 4px; }
 
     /* ── DRIVE MODAL ─────────────────────────────────────────── */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; animation: modalPop .24s cubic-bezier(.16,1,.3,1); }
-    @keyframes modalPop { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(8,6,18,.78); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-box {
+      background: linear-gradient(180deg, rgba(34,30,46,.96) 0%, rgba(22,20,32,.96) 100%);
+      border: 1px solid rgba(174,139,245,.22);
+      border-radius: 22px;
+      width: 100%; max-width: 500px; max-height: 82vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,.65), 0 0 0 1px rgba(174,139,245,.06), inset 0 1px 0 rgba(255,255,255,.05);
+      animation: modalPop .28s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes modalPop { from { transform: scale(.92) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
     #task-detail-body { background: var(--bg); }
-    .modal-hd { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
-    .modal-title { font-size: 14px; font-weight: 700; }
-    .modal-crumb { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-    .modal-back  { background: none; border: none; color: var(--primary-light); cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; padding: 4px 8px; white-space: nowrap; margin-top: 2px; }
-    .modal-list  { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .modal-hd {
+      padding: 18px 22px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(174,139,245,.06) 0%, transparent 100%);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .modal-title { font-size: 15px; font-weight: 700; letter-spacing: -.1px; }
+    .modal-crumb { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+    .modal-back  {
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-2); cursor: pointer; font-size: 13px; font-weight: 600;
+      font-family: inherit; padding: 5px 11px; border-radius: 9999px;
+      white-space: nowrap;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .modal-back:hover { background: rgba(255,80,80,.12); color: #ff8585; border-color: rgba(255,80,80,.3); }
+    .modal-list  { flex: 1; overflow-y: auto; padding: 8px 0; }
     .modal-item  { display: flex; align-items: center; gap: 12px; padding: 12px 20px; cursor: pointer; transition: background .1s; }
     .modal-item:hover { background: rgba(255,255,255,.04); }
     .modal-item-name { flex: 1; font-size: 14px; }
     .modal-arrow { color: var(--text-3); font-size: 12px; }
     .modal-state { padding: 40px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
-    .modal-ft { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-    .modal-cur { font-size: 12px; color: var(--text-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .btn-sm { padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,.04); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
-    .btn-sm:hover { background: rgba(255,255,255,.08); }
-    .btn-sm.accent { background: var(--primary); color: var(--primary-fg); border-color: var(--primary-light); }
+    .modal-ft {
+      padding: 14px 18px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      background: linear-gradient(0deg, rgba(0,0,0,.18) 0%, transparent 100%);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .modal-cur {
+      font-size: 12px; font-weight: 600; color: var(--text-2);
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+      padding: 5px 12px; border-radius: 9999px;
+      flex: 1; max-width: max-content; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .modal-cur.has-selection {
+      background: rgba(174,139,245,.14); color: var(--primary-light);
+      border-color: rgba(174,139,245,.35);
+    }
+    .btn-sm {
+      padding: 9px 18px; border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.04); color: var(--text);
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: background .15s, border-color .15s, transform .12s, box-shadow .15s;
+    }
+    .btn-sm:hover { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.16); }
+    .btn-sm:active { transform: scale(.97); }
+    .btn-sm.accent {
+      background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+      color: #fff; border-color: rgba(174,139,245,.55);
+      box-shadow: 0 8px 22px rgba(124,58,237,.38);
+    }
+    .btn-sm.accent:hover { box-shadow: 0 10px 28px rgba(124,58,237,.55); }
+    .btn-sm.accent:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 
     /* ── STATES ──────────────────────────────────────────────── */
     .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 24px; background: rgba(255,255,255,.02); border: 1px dashed var(--border); border-radius: 18px; text-align: center; }
@@ -426,10 +474,56 @@
     .assignee-btn:hover { border-color: var(--text-3); }
     .assignee-btn .ico-sm { color: var(--text-3); }
     .assignee-btn.empty > span { color: var(--text-3); }
-    .assignee-opt { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px; cursor: pointer; }
-    .assignee-opt:hover { background: var(--card-2); }
-    .assignee-opt input { width: 17px; height: 17px; accent-color: var(--primary); flex-shrink: 0; }
-    .assignee-opt span { font-size: 14px; color: var(--text); }
+    /* ── Assignee picker rows ───────────────────────────────────────── */
+    .assignee-opt {
+      display: flex; align-items: center; gap: 13px;
+      padding: 11px 14px; margin: 4px 10px; border-radius: 14px;
+      cursor: pointer; position: relative;
+      border: 1.5px solid transparent;
+      transition: background .18s ease, border-color .18s ease, transform .12s ease;
+    }
+    .assignee-opt:hover {
+      background: rgba(174,139,245,.06);
+      border-color: rgba(174,139,245,.18);
+    }
+    .assignee-opt:active { transform: scale(.985); }
+    .assignee-opt.selected {
+      background: linear-gradient(135deg, rgba(94,23,235,.18) 0%, rgba(94,23,235,.04) 100%);
+      border-color: rgba(174,139,245,.5);
+      box-shadow: 0 4px 14px rgba(94,23,235,.1);
+    }
+    .assignee-opt input { position: absolute; opacity: 0; pointer-events: none; }
+    .ao-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff;
+      letter-spacing: .5px; flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.18);
+    }
+    .ao-info { flex: 1; min-width: 0; }
+    .ao-name { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.25; }
+    .ao-pill {
+      font-size: 10px; font-weight: 700; padding: 3px 9px;
+      border-radius: 9999px; text-transform: uppercase; letter-spacing: .5px;
+      background: rgba(174,139,245,.15); color: var(--primary-light);
+      border: 1px solid rgba(174,139,245,.32);
+      flex-shrink: 0;
+    }
+    .ao-check {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 1.8px solid rgba(255,255,255,.18);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background .18s ease, border-color .18s ease, transform .18s cubic-bezier(.2,1.4,.5,1);
+      background: rgba(255,255,255,.02);
+    }
+    .ao-check svg { width: 14px; height: 14px; color: #fff; opacity: 0; transform: scale(.6); transition: opacity .15s, transform .2s cubic-bezier(.2,1.4,.5,1); }
+    .assignee-opt.selected .ao-check {
+      background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+      border-color: rgba(174,139,245,.7);
+      box-shadow: 0 4px 12px rgba(124,58,237,.45);
+    }
+    .assignee-opt.selected .ao-check svg { opacity: 1; transform: scale(1); }
     #assignee-modal { z-index: 1002; }
 
     /* ── IN-APP CALENDAR ────────────────────────────────── */
@@ -929,16 +1023,40 @@
     var e = email.toLowerCase();
     return taskAssignees(task).some(function(a){ return a.toLowerCase() === e; });
   }
+  // Stable two-color avatar gradient per person, derived from email/name hash.
+  var AVATAR_GRADIENTS = [
+    ['#7c3aed','#ec4899'], ['#10b981','#06b6d4'], ['#f59e0b','#ef4444'],
+    ['#3b82f6','#06b6d4'], ['#8b5cf6','#3b82f6'], ['#ec4899','#f59e0b'],
+    ['#06b6d4','#10b981'], ['#ef4444','#ec4899'], ['#14b8a6','#8b5cf6']
+  ];
+  function avatarFor(name, email) {
+    var parts = (name || '').trim().split(/\s+/);
+    var initials = ((parts[0] || '?')[0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+    var s = (email || name || ''), hash = 0;
+    for (var i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+    var g = AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+    return { initials: initials, c1: g[0], c2: g[1] };
+  }
+
   function renderAssigneeCheckboxes(containerId, selectedEmails) {
     var box = document.getElementById(containerId);
     box.innerHTML = '';
     var sel = (selectedEmails || []).map(function(e){ return e.toLowerCase(); });
     teamMembers.forEach(function(m) {
-      var lbl = document.createElement('label'); lbl.className = 'assignee-opt';
-      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = m.email;
-      if (sel.indexOf(m.email.toLowerCase()) >= 0) cb.checked = true;
-      var sp = document.createElement('span'); sp.textContent = m.name + (m.role === 'manager' ? ' (manager)' : '');
-      lbl.appendChild(cb); lbl.appendChild(sp);
+      var isChecked = sel.indexOf(m.email.toLowerCase()) >= 0;
+      var a = avatarFor(m.name, m.email);
+      var lbl = document.createElement('label');
+      lbl.className = 'assignee-opt' + (isChecked ? ' selected' : '');
+      lbl.innerHTML =
+        '<input type="checkbox" value="' + esc(m.email) + '"' + (isChecked ? ' checked' : '') + '>' +
+        '<div class="ao-avatar" style="background:linear-gradient(135deg,' + a.c1 + ' 0%,' + a.c2 + ' 100%)">' + esc(a.initials) + '</div>' +
+        '<div class="ao-info"><div class="ao-name">' + esc(m.name) + '</div></div>' +
+        (m.role === 'manager' ? '<span class="ao-pill">Manager</span>' : '') +
+        '<div class="ao-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 7"/></svg></div>';
+      var cb = lbl.querySelector('input');
+      cb.addEventListener('change', function() {
+        lbl.classList.toggle('selected', cb.checked);
+      });
       box.appendChild(lbl);
     });
   }
@@ -971,7 +1089,9 @@
   }
   function updateAssigneeModalCount() {
     var n = document.querySelectorAll('#assignee-modal-list input:checked').length;
-    document.getElementById('assignee-modal-count').textContent = n + (n === 1 ? ' selezionato' : ' selezionati');
+    var cur = document.getElementById('assignee-modal-count');
+    cur.textContent = n + (n === 1 ? ' selezionato' : ' selezionati');
+    cur.classList.toggle('has-selection', n > 0);
   }
   function confirmAssigneeModal() {
     var picked = getCheckedAssignees('assignee-modal-list');
