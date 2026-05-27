@@ -184,11 +184,12 @@
       box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(174,139,245,.4);
       z-index: 100; position: relative;
       cursor: grabbing !important;
-      will-change: transform, scale;
+      will-change: transform, scale, rotate;
       scale: 1.035;
+      rotate: -1.2deg;
       /* transform (translate) must update instantly to follow the finger; the
-         lift effect uses `scale` separately so it can be animated smoothly. */
-      transition: scale .16s cubic-bezier(.2,.9,.3,1), background .2s ease, border-color .2s ease, box-shadow .2s ease;
+         lift effect uses scale/rotate separately so they animate smoothly. */
+      transition: scale .18s cubic-bezier(.2,.9,.3,1), rotate .18s cubic-bezier(.2,.9,.3,1), background .2s ease, border-color .2s ease, box-shadow .2s ease;
     }
     .task-card.drag-deny { animation: dragShake .25s ease; }
     @keyframes dragShake { 0%,100% { translate: 0 0; } 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
@@ -1886,11 +1887,14 @@
     var dragging = false;
     var startX = 0, startY = 0;          // pointer at press-start
     var pointerCardOffset = 0;           // pointer Y - card's natural top at drag start
-    var cardNaturalTop = 0;              // cached natural top — recomputed only on swap
+    var cardNaturalTop = 0;              // cached natural top — recomputed on swap / scroll
     var lastDenyTarget = null;
     var suppressClickUntil = 0;
-    var lastTarget = null;               // card the pointer was last over
-    var swapBlockedUntil = 0;            // short cooldown after a swap so FLIP can settle
+    var lastTarget = null;
+    var swapBlockedUntil = 0;
+    var lastPointerY = 0;                // remembered so auto-scroll can re-apply
+    var autoScrollRAF = null;
+    var autoScrollSpeed = 0;             // px per frame; positive = down
 
     function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
@@ -1902,21 +1906,51 @@
     }
 
     function applyDrag(y) {
-      // Visual position = naturalTop + translateY; we want it = y - pointerCardOffset.
       var translateY = y - pointerCardOffset - cardNaturalTop;
       card.style.transform = 'translate3d(0,' + translateY + 'px,0)';
+    }
+
+    // ── Auto-scroll near viewport edges while dragging ──
+    function autoScrollTick() {
+      if (!dragging || !autoScrollSpeed) { autoScrollRAF = null; return; }
+      var before = window.scrollY;
+      window.scrollBy(0, autoScrollSpeed);
+      var actual = window.scrollY - before;
+      if (actual !== 0) {
+        // Layout shifted under the card — refresh and re-place under finger.
+        recomputeNaturalTop();
+        applyDrag(lastPointerY);
+      }
+      autoScrollRAF = requestAnimationFrame(autoScrollTick);
+    }
+    function updateAutoScroll(y) {
+      var EDGE = 90;            // px from top/bottom to start auto-scroll
+      var MAX_SPEED = 16;       // px per frame at the very edge
+      var vh = window.innerHeight;
+      var speed = 0;
+      if (y < EDGE) {
+        speed = -Math.ceil(((EDGE - y) / EDGE) * MAX_SPEED);
+      } else if (y > vh - EDGE) {
+        speed = Math.ceil(((y - (vh - EDGE)) / EDGE) * MAX_SPEED);
+      }
+      autoScrollSpeed = speed;
+      if (speed && !autoScrollRAF) autoScrollRAF = requestAnimationFrame(autoScrollTick);
+    }
+    function stopAutoScroll() {
+      autoScrollSpeed = 0;
+      if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
     }
 
     function beginDrag() {
       dragging = true;
       window._cardDragging = true;
-      // Make sure the pull-to-refresh pill is hidden and inactive.
       try {
         if (typeof _ptr !== 'undefined') { _ptr.active = false; _ptr.lastDy = 0; }
         if (_ptrPill) _ptrPill.classList.remove('show');
       } catch(e) {}
       recomputeNaturalTop();
       pointerCardOffset = startY - cardNaturalTop;
+      lastPointerY = startY;
       card.classList.add('dragging');
       applyDrag(startY);
       if (navigator.vibrate) navigator.vibrate(30);
@@ -1928,29 +1962,26 @@
       lastTarget = null;
       swapBlockedUntil = 0;
       cancelPress();
-      // Touch needs a longer hold so taps/scrolls aren't hijacked.
-      // Mouse uses a shorter hold so a normal click still works.
       pressTimer = setTimeout(beginDrag, isTouch ? 400 : 140);
     }
 
-    // FLIP — animate the siblings smoothly into their new positions after a
-    // DOM reorder. The dragged card is excluded (its position is set by JS).
     function flipSiblings(grid, doReorder) {
       var siblings = [];
       for (var i = 0; i < grid.children.length; i++) {
         var c = grid.children[i];
         if (c !== card && c.classList && c.classList.contains('task-card')) siblings.push(c);
       }
-      var firstTops = siblings.map(function(c) { return c.getBoundingClientRect().top; });
+      var firstRects = siblings.map(function(c) { var r = c.getBoundingClientRect(); return { top: r.top, left: r.left }; });
       doReorder();
       for (var i = 0; i < siblings.length; i++) {
         var c = siblings[i];
-        var delta = firstTops[i] - c.getBoundingClientRect().top;
-        if (Math.abs(delta) < 0.5) continue;
+        var r = c.getBoundingClientRect();
+        var dy = firstRects[i].top - r.top;
+        var dx = firstRects[i].left - r.left;
+        if (Math.abs(dy) < 0.5 && Math.abs(dx) < 0.5) continue;
         c.style.transition = 'none';
-        c.style.transform = 'translate3d(0,' + delta + 'px,0)';
+        c.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0)';
       }
-      // Force reflow so the "instant" placement is committed, then animate back.
       void grid.offsetWidth;
       for (var i = 0; i < siblings.length; i++) {
         siblings[i].style.transition = '';
@@ -1963,9 +1994,10 @@
         if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) cancelPress();
         return false;
       }
+      lastPointerY = y;
       applyDrag(y);
+      updateAutoScroll(y);
 
-      // Throttle swap re-evaluation while a prior FLIP is settling.
       if (Date.now() < swapBlockedUntil) return true;
 
       var prevPE = card.style.pointerEvents;
@@ -1992,11 +2024,13 @@
 
       var grid = targetCard.parentNode;
       var rect = targetCard.getBoundingClientRect();
-      var insertBefore = y < rect.top + rect.height / 2;
+      // Diagonal heuristic for multi-column grids: top-left half = before,
+      // bottom-right half = after. Works for single-column lists too.
+      var relX = (x - rect.left) / rect.width;
+      var relY = (y - rect.top) / rect.height;
+      var insertBefore = (relX + relY) < 1.0;
       var desired = insertBefore ? targetCard : targetCard.nextSibling;
 
-      // Skip if already in the desired position, or desired equals the dragged
-      // card itself (would be a self-swap no-op).
       if (desired === card || card.nextSibling === desired) {
         lastTarget = targetCard;
         return true;
@@ -2006,16 +2040,16 @@
       recomputeNaturalTop();
       applyDrag(y);
       lastTarget = targetCard;
-      swapBlockedUntil = Date.now() + 90; // brief cooldown so FLIP settles
+      swapBlockedUntil = Date.now() + 90;
       return true;
     }
 
     function endDrag() {
       cancelPress();
+      stopAutoScroll();
       if (!dragging) return;
       dragging = false;
       window._cardDragging = false;
-      // Smooth settle: animate transform back to 0 instead of snapping.
       card.style.transition = 'transform .24s cubic-bezier(.2,.9,.3,1)';
       card.style.transform = '';
       card.classList.remove('dragging');
