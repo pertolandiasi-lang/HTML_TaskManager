@@ -1858,8 +1858,17 @@
   }
 
   var _currentView = 'home';
+  var _viewHistory = [];                  // stack of previously-visited views, for edge-swipe back
+  var _skipHistoryPush = false;           // set true when navigating back so the pop isn't re-pushed
 
   function switchView(v) {
+    if (v && v !== _currentView) {
+      if (_skipHistoryPush) _skipHistoryPush = false;
+      else {
+        _viewHistory.push(_currentView);
+        if (_viewHistory.length > 20) _viewHistory.shift();
+      }
+    }
     _currentView = v;
     ['home','manager','employee','calendar','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
@@ -1874,6 +1883,14 @@
     if (v === 'calendar') loadCalendar();
     if (v === 'overview') loadOverview();
     if (v === 'search') loadSearch();
+  }
+
+  function goBackView() {
+    if (_viewHistory.length === 0) return false;
+    var prev = _viewHistory.pop();
+    _skipHistoryPush = true;
+    switchView(prev);
+    return true;
   }
 
   var HOME_ICONS = {
@@ -2779,6 +2796,66 @@
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && accessToken) refreshCurrentView();
   });
+
+  // ── EDGE-SWIPE BACK (mobile) ─────────────────────────────────────────
+  // Touch starts within EDGE px of the left side, swipe right by MIN_DX → goBackView().
+  // Suppressed during card drag, while a modal is open, or when there's no history.
+  (function setupEdgeSwipeBack() {
+    var EDGE = 30;
+    var MIN_DX = 80;
+    var MAX_TIME = 700;
+    var startX = 0, startY = 0, startT = 0, tracking = false, moved = false;
+    var mainEl = null;
+    function getMain() { if (!mainEl) mainEl = document.querySelector('.main'); return mainEl; }
+    function snapBack() {
+      var m = getMain(); if (!m) return;
+      m.style.transition = 'transform .2s cubic-bezier(.2,.9,.3,1)';
+      m.style.transform = '';
+      setTimeout(function(){ if (m) m.style.transition = ''; }, 220);
+    }
+    function isModalOpen() {
+      var ms = document.querySelectorAll('.modal-overlay');
+      for (var i = 0; i < ms.length; i++) if (!ms[i].classList.contains('hidden')) return true;
+      return false;
+    }
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length !== 1) return;
+      var t = e.touches[0];
+      if (t.clientX > EDGE) return;
+      if (window._cardDragging) return;
+      if (isModalOpen()) return;
+      if (_viewHistory.length === 0) return;
+      startX = t.clientX; startY = t.clientY; startT = Date.now();
+      tracking = true; moved = false;
+    }, { passive: true });
+    document.addEventListener('touchmove', function(e) {
+      if (!tracking) return;
+      var t = e.touches[0];
+      var dx = t.clientX - startX;
+      var dy = Math.abs(t.clientY - startY);
+      if (!moved && dy > Math.abs(dx) * 1.2) { tracking = false; return; }
+      if (dx > 0) {
+        moved = true;
+        var m = getMain(); if (m) m.style.transform = 'translateX(' + dx + 'px)';
+      }
+    }, { passive: true });
+    document.addEventListener('touchend', function(e) {
+      if (!tracking) return;
+      tracking = false;
+      var t = (e.changedTouches && e.changedTouches[0]) || null;
+      var dx = t ? (t.clientX - startX) : 0;
+      var dt = Date.now() - startT;
+      snapBack();
+      if (dx >= MIN_DX && dt <= MAX_TIME) {
+        if (typeof goBackView === 'function') goBackView();
+      }
+    });
+    document.addEventListener('touchcancel', function() {
+      if (!tracking) return;
+      tracking = false;
+      snapBack();
+    });
+  })();
 
   // Pull-to-refresh
   var _ptr = { y0: 0, lastDy: 0, active: false, threshold: 72 };
