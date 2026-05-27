@@ -210,17 +210,26 @@
        so 4 (manager) or 3 (employee) cards are equal and use all the space.
        Pull-to-refresh keeps working (touch event, not scroll). */
     @media (max-width: 768px) {
-      body.is-home { overflow: hidden; height: 100dvh; }
+      /* Make body a flex column that exactly fills the viewport, so the
+         header stays put and tile heights are computed from real available
+         space (no hardcoded header-height assumptions, so the bottom
+         corners never get cut off — works on phones with/without a notch). */
+      body.is-home {
+        overflow: hidden;
+        height: 100dvh;
+        display: flex; flex-direction: column;
+      }
+      body.is-home .header { flex-shrink: 0; }
       body.is-home .main {
-        height: calc(100dvh - 72px); /* viewport minus header */
-        padding-top: 20px; padding-bottom: 20px;
+        flex: 1; min-height: 0;
+        padding-top: 18px; padding-bottom: 18px;
         display: flex; flex-direction: column;
       }
       body.is-home #view-home {
         flex: 1; min-height: 0;
         display: flex; flex-direction: column;
       }
-      body.is-home .home-hd { flex-shrink: 0; margin-bottom: 18px; }
+      body.is-home .home-hd { flex-shrink: 0; margin-bottom: 16px; }
       body.is-home .home-greet { font-size: 22px; }
       body.is-home .home-grid {
         flex: 1; min-height: 0;
@@ -230,30 +239,32 @@
         grid-template-rows: 1fr 1fr; /* manager: 2 equal rows (2×2) */
       }
       body.is-home .home-tile {
-        min-height: 0; /* allow grid row sizing to take over */
-        padding: 18px 16px; gap: 10px;
+        min-height: 0; /* let the grid row sizing take over */
+        padding: 14px;
+        gap: 10px;
       }
-      body.is-home .home-tile-icon { width: 46px; height: 46px; border-radius: 12px; }
-      body.is-home .home-tile-icon svg { width: 22px; height: 22px; }
-      body.is-home .home-tile-label { font-size: 15px; }
+      body.is-home .home-tile-icon { width: 56px; height: 56px; border-radius: 16px; }
+      body.is-home .home-tile-icon svg { width: 28px; height: 28px; }
+      body.is-home .home-tile-label { font-size: 16px; }
       body.is-home .home-tile-desc { font-size: 12px; }
     }
     .home-tile {
       position: relative;
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 20px; padding: 28px 22px;
+      border-radius: 20px; padding: 24px 18px;
       min-height: 180px;
       cursor: pointer;
       transition: transform .18s var(--ease), border-color .18s var(--ease), box-shadow .22s var(--ease), background .22s var(--ease);
-      display: flex; flex-direction: column; gap: 18px;
-      text-align: left; color: var(--text); font-family: inherit;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      text-align: center; color: var(--text); font-family: inherit;
       box-shadow: var(--shadow-sm);
     }
     .home-tile:hover { transform: translateY(-3px); background: var(--card-2); border-color: rgba(96,165,250,.45); }
     .home-tile:active { transform: scale(.97); }
     .home-tile-icon {
-      width: 56px; height: 56px; border-radius: 14px;
+      width: 68px; height: 68px; border-radius: 18px;
       background: rgba(96,165,250,.14);
       color: var(--primary-light);
       display: flex; align-items: center; justify-content: center;
@@ -261,9 +272,10 @@
       transition: background .22s ease, color .22s ease, transform .22s var(--ease);
     }
     .home-tile:hover .home-tile-icon { background: var(--accent-grad); color: #fff; transform: scale(1.08); }
-    .home-tile-icon svg { width: 28px; height: 28px; }
+    .home-tile-icon svg { width: 34px; height: 34px; }
+    .home-tile-text { display: flex; flex-direction: column; gap: 4px; }
     .home-tile-label { font-size: 17px; font-weight: 700; letter-spacing: -.15px; }
-    .home-tile-desc  { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+    .home-tile-desc  { font-size: 13px; color: var(--text-3); }
 
     /* ── MANAGER GRID ────────────────────────────────────────── */
     .manager-grid { display: grid; grid-template-columns: 1fr 268px; gap: 20px; align-items: start; }
@@ -1965,7 +1977,7 @@
     hg.innerHTML = tiles.map(function(t) {
       return '<button class="home-tile" onclick="navTo(\''+t.v+'\')">'
         + '<span class="home-tile-icon">'+HOME_ICONS[t.icon]+'</span>'
-        + '<div><div class="home-tile-label">'+esc(t.label)+'</div><div class="home-tile-desc">'+esc(t.desc)+'</div></div>'
+        + '<div class="home-tile-text"><div class="home-tile-label">'+esc(t.label)+'</div><div class="home-tile-desc">'+esc(t.desc)+'</div></div>'
         + '</button>';
     }).join('');
   }
