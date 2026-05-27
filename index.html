@@ -1999,12 +1999,11 @@
     }
     var data = { company:company, assignees:assignees, assignDate:assignDate, deadline:deadline, brief:brief, driveUrl:driveUrl };
     resetForm();
-    showToast('Task "'+company+'" in creazione', 'loading');
-    createTask(data).then(function() {
-      showToast('✓ Task "'+company+'" creato!','success');
-      refreshCurrentView();
-    }).catch(function(err) {
-      hideToast();
+    // Optimistic: show success right away, run the actual creation silently in
+    // the background. If anything fails, the persistent error popup will
+    // surface it (it sticks until acknowledged).
+    showToast('✓ Task "'+company+'" creato!', 'success');
+    createTask(data).catch(function(err) {
       showError('Creazione del task "'+company+'" non riuscita: '+err.message+' — verifica nella lista task.', null, company);
     });
   }
@@ -2911,9 +2910,8 @@
     var prev = task ? task.status : newStatus;
     var meKey = (userEmail || '').toLowerCase();
     var prevMine = (task && task.statusMap) ? task.statusMap[meKey] : prev;
-    // optimistic — update the UI instantly. `status` here is "what the caller sees":
-    // the caller is necessarily an assignee (otherwise the select isn't rendered),
-    // so updating their own slot is the right semantics.
+    // Optimistic — update the UI + local cache instantly. The caller is always
+    // an assignee (otherwise the <select> isn't rendered) so we update their slot.
     if (task) {
       task.status = newStatus;
       task.statusMap = task.statusMap || {};
@@ -2921,9 +2919,10 @@
     }
     _applyStatusClass(selEl, newStatus);
     showToast('✓ Stato aggiornato: ' + newStatus, 'success');
-    updateTaskStatus(taskId, newStatus).then(function() {
-      refreshCurrentView();
-    }).catch(function(e) {
+    // Sync silently in the background. NO refresh on success — the optimistic
+    // update is already correct and re-fetching causes a visible flash where
+    // the UI briefly snaps back to the server's older value.
+    updateTaskStatus(taskId, newStatus).catch(function(e) {
       if (task) {
         task.status = prev;
         if (task.statusMap) task.statusMap[meKey] = prevMine;
