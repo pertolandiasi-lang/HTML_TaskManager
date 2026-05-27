@@ -55,6 +55,14 @@
       min-height: 100vh;
       overflow-x: hidden;
       padding-bottom: env(safe-area-inset-bottom);
+      /* App-wide: no text selection or iOS callout on tap-and-hold —
+         feels native on touch. Form fields re-enable selection below. */
+      -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+    }
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text; user-select: text;
+      -webkit-touch-callout: default;
     }
 
     /* ── SIGN-IN SCREEN ─────────────────────────────────────── */
