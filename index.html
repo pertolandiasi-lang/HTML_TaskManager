@@ -182,7 +182,10 @@
     .task-card.drag-deny { animation: dragShake .25s ease; }
     @keyframes dragShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
-    .task-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .15s, box-shadow .15s; }
+    .task-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .15s, box-shadow .15s;
+      -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+      -webkit-touch-callout: none; touch-action: pan-y; }
+    .task-card.dragging { cursor: grabbing; }
     .task-card:hover { border-color: rgba(174,139,245,.22); box-shadow: 0 0 0 1px rgba(174,139,245,.08); }
     .task-card.done { opacity: .65; }
     .tc-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -1856,7 +1859,7 @@
     }
   }
 
-  // ── Long-press touch reorder ───────────────────────────────────────────
+  // ── Long-press reorder (touch + mouse) ─────────────────────────────────
   // Reordering is allowed only WITHIN the same day section, because the
   // deadline-date order has priority. Dragging into another day shakes the
   // card and shows an error toast explaining why.
@@ -1865,73 +1868,97 @@
     var dragging = false;
     var startX = 0, startY = 0;
     var lastDenyTarget = null;
+    var suppressClickUntil = 0;
 
     function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-    function endDrag() {
-      if (!dragging) return;
-      dragging = false;
-      card.classList.remove('dragging');
-      persistSectionOrder(card.parentNode);
-    }
-
-    card.addEventListener('touchstart', function(e) {
-      if (e.touches.length !== 1) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
+    function startPress(x, y) {
+      startX = x; startY = y;
       lastDenyTarget = null;
+      cancelPress();
       pressTimer = setTimeout(function() {
         dragging = true;
         card.classList.add('dragging');
         if (navigator.vibrate) navigator.vibrate(40);
-      }, 500);
-    }, { passive: true });
-
-    card.addEventListener('touchmove', function(e) {
+      }, 450);
+    }
+    function moveDuringPress(x, y) {
       if (!dragging) {
-        // If the user is just scrolling, cancel the press.
-        var dx = e.touches[0].clientX - startX;
-        var dy = e.touches[0].clientY - startY;
-        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) cancelPress();
-        return;
+        // If the user is just scrolling/moving, cancel the press.
+        if (Math.abs(x - startX) > 8 || Math.abs(y - startY) > 8) cancelPress();
+        return false;
       }
-      e.preventDefault(); // suppress scroll while actively dragging
-      var touch = e.touches[0];
       // Hide the dragged card briefly so elementFromPoint sees what's beneath
       var prevVis = card.style.visibility;
       card.style.visibility = 'hidden';
-      var under = document.elementFromPoint(touch.clientX, touch.clientY);
+      var under = document.elementFromPoint(x, y);
       card.style.visibility = prevVis;
 
       var targetCard = under && under.closest && under.closest('.task-card');
-      if (!targetCard || targetCard === card) return;
+      if (!targetCard || targetCard === card) return true;
       var targetSection = targetCard.closest('.day-section');
       var targetDateKey = targetSection && targetSection.dataset.dateKey;
 
       if (targetDateKey === dateKey) {
         var grid = targetCard.parentNode;
         var rect = targetCard.getBoundingClientRect();
-        var insertBefore = touch.clientY < rect.top + rect.height / 2;
+        var insertBefore = y < rect.top + rect.height / 2;
         if (insertBefore) grid.insertBefore(card, targetCard);
         else grid.insertBefore(card, targetCard.nextSibling);
       } else if (lastDenyTarget !== targetDateKey) {
         // Crossing into another day — show the rule once per target section.
         lastDenyTarget = targetDateKey;
         card.classList.remove('drag-deny');
-        // force reflow so the animation re-triggers
-        void card.offsetWidth;
+        void card.offsetWidth; // force reflow so the animation re-triggers
         card.classList.add('drag-deny');
         showReorderError();
       }
-    }, { passive: false });
+      return true;
+    }
+    function endDrag() {
+      cancelPress();
+      if (!dragging) return;
+      dragging = false;
+      card.classList.remove('dragging');
+      suppressClickUntil = Date.now() + 350;
+      persistSectionOrder(card.parentNode);
+    }
 
-    card.addEventListener('touchend', function() {
-      cancelPress();
-      endDrag();
+    // ── Touch (mobile) ──
+    card.addEventListener('touchstart', function(e) {
+      if (e.touches.length !== 1) return;
+      startPress(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    card.addEventListener('touchmove', function(e) {
+      var t = e.touches[0];
+      if (moveDuringPress(t.clientX, t.clientY)) e.preventDefault();
+    }, { passive: false });
+    card.addEventListener('touchend', endDrag);
+    card.addEventListener('touchcancel', endDrag);
+
+    // ── Mouse (desktop) ──
+    card.addEventListener('mousedown', function(e) {
+      // Only left button, and ignore clicks on interactive children
+      if (e.button !== 0) return;
+      if (e.target.closest('button, select, a, input, textarea, .status-pill, .assignee-row')) return;
+      startPress(e.clientX, e.clientY);
     });
-    card.addEventListener('touchcancel', function() {
-      cancelPress();
-      endDrag();
-    });
+    // Listen on document so a fast drag doesn't lose the card if the cursor
+    // briefly leaves it.
+    var docMouseMove = function(e) {
+      if (!pressTimer && !dragging) return;
+      if (moveDuringPress(e.clientX, e.clientY)) e.preventDefault();
+    };
+    var docMouseUp = function() {
+      if (pressTimer || dragging) endDrag();
+    };
+    document.addEventListener('mousemove', docMouseMove);
+    document.addEventListener('mouseup', docMouseUp);
+
+    // Suppress the click that fires right after a drag-release so it doesn't
+    // open a status select / assignee popup.
+    card.addEventListener('click', function(e) {
+      if (Date.now() < suppressClickUntil) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
   }
 
   function persistSectionOrder(grid) {
