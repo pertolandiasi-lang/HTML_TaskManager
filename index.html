@@ -40,7 +40,6 @@
       --accent-grad:    linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
       --accent-grad-hi: linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%);
       --accent-glow:    0 10px 28px rgba(59,130,246,.42);
-      --card-grad:      linear-gradient(180deg, rgba(40,36,56,.62) 0%, rgba(28,26,40,.62) 100%);
       --ring-focus:     0 0 0 3px rgba(96,165,250,.22);
     }
 
@@ -329,7 +328,7 @@
     .day-section.overdue  .day-section-hd { color: var(--status-todo); }
     .day-section.overdue  .day-section-count { background: rgba(255,107,107,.14); color: var(--status-todo); border-color: rgba(255,107,107,.3); }
     .task-card.dragging {
-      background: linear-gradient(140deg, var(--card) 0%, rgba(37,99,235,.20) 100%);
+      background: var(--card-2);
       border-color: rgba(96,165,250,.6);
       box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(96,165,250,.4);
       z-index: 100; position: relative;
@@ -474,7 +473,7 @@
     .empty-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 80px 24px;
-      background: linear-gradient(180deg, rgba(40,36,56,.32) 0%, rgba(28,26,40,.32) 100%);
+      background: var(--card);
       border: 1.5px dashed rgba(255,255,255,.10);
       border-radius: 20px; text-align: center;
     }
@@ -691,9 +690,8 @@
     }
     .assignee-opt:active { transform: scale(.985); }
     .assignee-opt.selected {
-      background: linear-gradient(135deg, rgba(37,99,235,.18) 0%, rgba(37,99,235,.04) 100%);
+      background: rgba(37,99,235,.14);
       border-color: rgba(96,165,250,.5);
-      box-shadow: 0 4px 14px rgba(37,99,235,.1);
     }
     .assignee-opt input { position: absolute; opacity: 0; pointer-events: none; }
     .ao-avatar {
