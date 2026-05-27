@@ -178,14 +178,13 @@
     .day-section-count { font-size: 11px; color: var(--text-3); background: var(--card-2); padding: 1px 8px; border-radius: 9999px; font-weight: 600; letter-spacing: 0; text-transform: none; }
     .day-section.today    .day-section-hd { color: var(--primary-light); }
     .day-section.overdue  .day-section-hd { color: var(--status-todo); }
-    .task-card.dragging { opacity: .55; transform: scale(1.02); box-shadow: 0 12px 32px rgba(0,0,0,.55); z-index: 100; position: relative; transition: transform .12s, box-shadow .12s, opacity .12s; }
+    .task-card.dragging { opacity: .9; box-shadow: 0 16px 40px rgba(0,0,0,.6); z-index: 100; position: relative; cursor: grabbing !important; will-change: transform; }
     .task-card.drag-deny { animation: dragShake .25s ease; }
     @keyframes dragShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 
     .task-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 14px; transition: border-color .15s, box-shadow .15s;
       -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
-      -webkit-touch-callout: none; touch-action: pan-y; }
-    .task-card.dragging { cursor: grabbing; }
+      -webkit-touch-callout: none; touch-action: pan-y; cursor: grab; }
     .task-card:hover { border-color: rgba(174,139,245,.22); box-shadow: 0 0 0 1px rgba(174,139,245,.08); }
     .task-card.done { opacity: .65; }
     .tc-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -1861,37 +1860,53 @@
 
   // ── Long-press reorder (touch + mouse) ─────────────────────────────────
   // Reordering is allowed only WITHIN the same day section, because the
-  // deadline-date order has priority. Dragging into another day shakes the
-  // card and shows an error toast explaining why.
+  // deadline-date order has priority. The card visually follows the
+  // pointer (translate3d). Dragging into another day shakes the card and
+  // shows an error toast explaining why.
+  var INTERACTIVE_SEL = 'button, select, a, input, textarea, .status-pill, .tc-status-wrap, .tc-status-sel, .tc-status-arrow, .tc-link';
+
   function attachReorderHandlers(card, dateKey) {
     var pressTimer = null;
     var dragging = false;
-    var startX = 0, startY = 0;
+    var startX = 0, startY = 0;          // pointer at press-start
+    var anchorY = 0;                     // pointer Y from which translate is measured
     var lastDenyTarget = null;
     var suppressClickUntil = 0;
 
     function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-    function startPress(x, y) {
+
+    function beginDrag() {
+      dragging = true;
+      anchorY = startY;
+      card.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(40);
+    }
+
+    function startPress(x, y, isTouch) {
       startX = x; startY = y;
       lastDenyTarget = null;
       cancelPress();
-      pressTimer = setTimeout(function() {
-        dragging = true;
-        card.classList.add('dragging');
-        if (navigator.vibrate) navigator.vibrate(40);
-      }, 450);
+      // Touch needs the 450ms hold (so taps/scrolls aren't hijacked).
+      // Mouse begins drag after a tiny hold so a normal click still works.
+      pressTimer = setTimeout(beginDrag, isTouch ? 450 : 180);
     }
+
     function moveDuringPress(x, y) {
       if (!dragging) {
-        // If the user is just scrolling/moving, cancel the press.
-        if (Math.abs(x - startX) > 8 || Math.abs(y - startY) > 8) cancelPress();
+        // If the user moved significantly before the timer fired, treat it as
+        // a scroll/click drag and cancel the press.
+        if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) cancelPress();
         return false;
       }
-      // Hide the dragged card briefly so elementFromPoint sees what's beneath
-      var prevVis = card.style.visibility;
-      card.style.visibility = 'hidden';
+      // Make the card visually follow the pointer
+      var dy = y - anchorY;
+      card.style.transform = 'translate3d(0,' + dy + 'px,0)';
+
+      // Find what's under the pointer — hide the card so it doesn't return itself
+      var prevPE = card.style.pointerEvents;
+      card.style.pointerEvents = 'none';
       var under = document.elementFromPoint(x, y);
-      card.style.visibility = prevVis;
+      card.style.pointerEvents = prevPE;
 
       var targetCard = under && under.closest && under.closest('.task-card');
       if (!targetCard || targetCard === card) return true;
@@ -1904,6 +1919,10 @@
         var insertBefore = y < rect.top + rect.height / 2;
         if (insertBefore) grid.insertBefore(card, targetCard);
         else grid.insertBefore(card, targetCard.nextSibling);
+        // Re-anchor so the card stops "jumping" — subsequent moves are
+        // measured from the pointer's current Y.
+        anchorY = y;
+        card.style.transform = 'translate3d(0,0,0)';
       } else if (lastDenyTarget !== targetDateKey) {
         // Crossing into another day — show the rule once per target section.
         lastDenyTarget = targetDateKey;
@@ -1914,10 +1933,12 @@
       }
       return true;
     }
+
     function endDrag() {
       cancelPress();
       if (!dragging) return;
       dragging = false;
+      card.style.transform = '';
       card.classList.remove('dragging');
       suppressClickUntil = Date.now() + 350;
       persistSectionOrder(card.parentNode);
@@ -1926,7 +1947,8 @@
     // ── Touch (mobile) ──
     card.addEventListener('touchstart', function(e) {
       if (e.touches.length !== 1) return;
-      startPress(e.touches[0].clientX, e.touches[0].clientY);
+      if (e.target.closest(INTERACTIVE_SEL)) return;
+      startPress(e.touches[0].clientX, e.touches[0].clientY, true);
     }, { passive: true });
     card.addEventListener('touchmove', function(e) {
       var t = e.touches[0];
@@ -1937,16 +1959,15 @@
 
     // ── Mouse (desktop) ──
     card.addEventListener('mousedown', function(e) {
-      // Only left button, and ignore clicks on interactive children
       if (e.button !== 0) return;
-      if (e.target.closest('button, select, a, input, textarea, .status-pill, .assignee-row')) return;
-      startPress(e.clientX, e.clientY);
+      if (e.target.closest(INTERACTIVE_SEL)) return;
+      startPress(e.clientX, e.clientY, false);
+      e.preventDefault(); // suppress native text-selection drag
     });
-    // Listen on document so a fast drag doesn't lose the card if the cursor
-    // briefly leaves it.
+    // Document-level so a fast cursor still tracks even off the card
     var docMouseMove = function(e) {
       if (!pressTimer && !dragging) return;
-      if (moveDuringPress(e.clientX, e.clientY)) e.preventDefault();
+      moveDuringPress(e.clientX, e.clientY);
     };
     var docMouseUp = function() {
       if (pressTimer || dragging) endDrag();
