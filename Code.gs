@@ -10,9 +10,12 @@ const CAL_SHEET_ID = '1AA97-4g9UyFzkSse9zoed6bNY3HkIzb84o-adm96sVM';
 
 // Etichetta della build. Serve a rispondere alla domanda "il codice che ho
 // salvato è davvero quello che sta girando?", che senza un modo di chiederlo
-// dall'esterno si può solo dedurre dagli errori. Va alzata quando si cambia
-// qualcosa che deve arrivare in produzione.
-const BUILD = '2026-08-08-editoriale';
+// dall'esterno si può solo dedurre dagli errori.
+//
+// VA CAMBIATA A OGNI MODIFICA DI QUESTO FILE. Lasciandola ferma la sonda
+// risponde "tutto a posto" anche su un deployment vecchio di tre versioni, che
+// è peggio di non avere nessuna sonda.
+const BUILD = '2026-08-08-liste-unione';
 
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
 
@@ -455,16 +458,26 @@ function getCalendarioListe_() {
     });
     return v.sort(function (a, b) { return a.localeCompare(b, 'it'); });
   }
-  if (!out.clienti.length)  out.clienti  = distinti(2);
-  if (!out.canali.length)   out.canali   = distinti(3);
-  if (!out.formati.length)  out.formati  = distinti(4);
-  if (!out.pilastri.length) out.pilastri = distinti(5);
-  if (!out.stati.length)    out.stati    = distinti(10);
+  // Unione, non ripiego. Prendere i valori "solo se la lista è vuota" sembrava
+  // ragionevole ma dava tendine monche: i post generati dallo script hanno
+  // tutti canale Instagram, quindi bastava una riga nel DB perché il canale
+  // mostrasse quell'unica voce e nascondesse tutte le altre.
+  function unisci() {
+    var v = [], visti = {};
+    for (var i = 0; i < arguments.length; i++) {
+      (arguments[i] || []).forEach(function (x) {
+        var s = String(x || '').trim();
+        if (s && !visti[s]) { visti[s] = 1; v.push(s); }
+      });
+    }
+    return v;
+  }
 
-  if (!out.stati.length)    out.stati    = ['Idea','Da produrre','In revisione','Approvato','Programmato','Pubblicato'];
-  if (!out.formati.length)  out.formati  = ['Post','Carosello','Reel','Storia','Video','Articolo'];
-  if (!out.canali.length)   out.canali   = ['Instagram','Facebook','TikTok','LinkedIn','YouTube'];
-  if (!out.pilastri.length) out.pilastri = ['Prodotto','Dietro le quinte','Educativo','Social proof','Promo','Community'];
+  out.clienti  = unisci(out.clienti, distinti(2));
+  out.canali   = unisci(out.canali, distinti(3),  ['Instagram','Facebook','TikTok','LinkedIn','YouTube']);
+  out.formati  = unisci(out.formati, distinti(4), ['Post','Carosello','Reel','Storia','Video','Articolo']);
+  out.pilastri = unisci(out.pilastri, distinti(5),['Prodotto','Dietro le quinte','Educativo','Social proof','Promo','Community']);
+  out.stati    = unisci(out.stati, distinti(10),  ['Idea','Da produrre','In revisione','Approvato','Programmato','Pubblicato']);
 
   return out;
 }
