@@ -6,7 +6,7 @@ const BACKUP_RETENTION_DAYS = 30;
 // Calendario editoriale: è un ALTRO foglio, non questo. Non serve un secondo
 // progetto Apps Script né un secondo login: il web app gira come USER_DEPLOYING
 // e quell'account possiede entrambi i file.
-const CAL_SHEET_ID = '1CZ3arWFFWZ6qEjqvYZ7Ux9GBsV9rR8R64o5NJciGPtA';
+const CAL_SHEET_ID = '1AA97-4g9UyFzkSse9zoed6bNY3HkIzb84o-adm96sVM';
 
 // Etichetta della build. Serve a rispondere alla domanda "il codice che ho
 // salvato è davvero quello che sta girando?", che senza un modo di chiederlo
@@ -332,8 +332,29 @@ function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, 
  * una settimana.
  */
 function getCalendarioPosts_(from, to) {
-  var sh = SpreadsheetApp.openById(CAL_SHEET_ID).getSheetByName('DB');
-  if (!sh) throw new Error('Il calendario editoriale non ha un tab "DB"');
+  // I due modi in cui questo può fallire hanno entrambi messaggi inutili di
+  // default, e in un'app che gira nel browser un errore incomprensibile costa
+  // mezz'ora di caccia al bug sbagliato. Quindi si spiegano da soli.
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(CAL_SHEET_ID);
+  } catch (e) {
+    throw new Error(
+      'Non riesco ad aprire il file del calendario editoriale. Il web app gira ' +
+      'come l\'account che l\'ha distribuito: se il foglio appartiene a un altro ' +
+      'account, va condiviso con quello. ID cercato: ' + CAL_SHEET_ID
+    );
+  }
+
+  var sh = ss.getSheetByName('DB');
+  if (!sh) {
+    var nomi = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
+    throw new Error(
+      'Nel calendario editoriale non c\'è nessun tab chiamato "DB". ' +
+      'Le linguette che ho trovato sono: ' + nomi + '. ' +
+      'Se il foglio è nuovo, va prima generato con lo script del calendario.'
+    );
+  }
 
   var last = sh.getLastRow();
   if (last < 2) return [];
