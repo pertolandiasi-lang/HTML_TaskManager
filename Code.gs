@@ -3,6 +3,11 @@ const DRIVE_FOLDER = '1qZdcgxj1neycYTj4BmTQhI1SbGklgowc';
 const BACKUP_FOLDER = '1ct1aOAP0Qapa3AlcGKJmWxqp5w7ilPCp'; // Drive folder for daily Sheet backups
 const BACKUP_RETENTION_DAYS = 30;
 
+// Calendario editoriale: è un ALTRO foglio, non questo. Non serve un secondo
+// progetto Apps Script né un secondo login: il web app gira come USER_DEPLOYING
+// e quell'account possiede entrambi i file.
+const CAL_SHEET_ID = '1CZ3arWFFWZ6qEjqvYZ7Ux9GBsV9rR8R64o5NJciGPtA';
+
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
 
 function doPost(e) {
@@ -73,6 +78,12 @@ function dispatch_(p) {
       requireRole_(callerEmail, 'manager');
       setupSheetValidation();
       return respond_({ ok: true });
+
+    // Calendario editoriale, solo manager: i piani dei clienti social non
+    // c'entrano niente coi task dei dipendenti.
+    case 'getCalendario':
+      requireRole_(callerEmail, 'manager');
+      return respond_({ posts: getCalendarioPosts_(p.from, p.to) });
 
     default:
       throw new Error('Azione non riconosciuta');
@@ -291,6 +302,63 @@ function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, 
   body.appendParagraph('Brief:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
   body.appendParagraph(brief || '—');
   doc.saveAndClose();
+}
+
+// ── CALENDARIO EDITORIALE ────────────────────────────────────────────────────
+
+/**
+ * I post del calendario editoriale in un intervallo di date.
+ *
+ * Legge SOLO il tab DB, che è l'unico posto dove si scrive davvero in quel
+ * foglio: Calendario, Matrice, Settimana e Dashboard sono quattro rendering
+ * delle stesse righe, fatti a formule perché in un foglio non puoi fare altro.
+ * Rifarli qui in HTML sarebbe reimplementare un foglio di calcolo nel browser:
+ * il frontend riceve i dati grezzi e disegna le viste che gli servono.
+ *
+ * L'intervallo non è un lusso: il piano è di ~1.200 righe (30 clienti x 3 mesi),
+ * e spedirle tutte a ogni apertura sarebbe mezzo megabyte di JSON per vedere
+ * una settimana.
+ */
+function getCalendarioPosts_(from, to) {
+  var sh = SpreadsheetApp.openById(CAL_SHEET_ID).getSheetByName('DB');
+  if (!sh) throw new Error('Il calendario editoriale non ha un tab "DB"');
+
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+
+  // A..O: le colonne che si compilano. P..T sono calcolate e servono al foglio,
+  // non a noi.
+  var rows = sh.getRange(2, 1, last - 1, 15).getValues();
+  var tz   = Session.getScriptTimeZone();
+  var da   = from ? new Date(from + 'T00:00:00') : null;
+  var al   = to   ? new Date(to   + 'T23:59:59') : null;
+
+  var out = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    // Una data scritta come testo non è un post: nel foglio sparirebbe dalle
+    // viste senza dare errore, e qui la si salta per lo stesso motivo.
+    if (!(r[0] instanceof Date)) continue;
+    if (da && r[0] < da) continue;
+    if (al && r[0] > al) continue;
+
+    out.push({
+      riga:     i + 2,                     // riga nel DB, per aprire il foglio sul punto giusto
+      data:     Utilities.formatDate(r[0], tz, 'yyyy-MM-dd'),
+      ora:      (r[1] instanceof Date) ? Utilities.formatDate(r[1], tz, 'HH:mm') : '',
+      cliente:  String(r[2]  || ''),
+      canale:   String(r[3]  || ''),
+      formato:  String(r[4]  || ''),
+      pilastro: String(r[5]  || ''),
+      titolo:   String(r[6]  || ''),
+      copy:     String(r[7]  || ''),
+      asset:    String(r[9]  || ''),
+      stato:    String(r[10] || ''),
+      note:     String(r[11] || ''),
+      link:     String(r[12] || '')
+    });
+  }
+  return out;
 }
 
 // ── SHEET VALIDATION SETUP (run once) ────────────────────────────────────────

@@ -877,6 +877,36 @@
       .form-hint { font-size: 11px; line-height: 1.45; flex: 1; }
       .btn-primary { padding: 14px 22px; font-size: 15px; border-radius: 12px; flex-shrink: 0; }
     }
+
+    /* ── Calendario editoriale ──────────────────────────────────────────── */
+    .ed-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 18px; }
+    .ed-filters select {
+      background: var(--card); color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600;
+      font-family: inherit; flex: 1 1 160px; min-width: 0;
+    }
+    .ed-day { margin-bottom: 26px; }
+    .ed-day-hd {
+      display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .ed-day-name { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -.2px; }
+    .ed-day-hd.is-today .ed-day-name { color: var(--primary-light); }
+    .ed-day-count { font-size: 11px; color: var(--text-3); font-weight: 700; }
+    .ed-post {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    }
+    /* La barretta di stato: su un elenco lungo il colore si legge prima del testo */
+    .ed-bar { width: 4px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }
+    .ed-body { min-width: 0; flex: 1; }
+    .ed-meta { font-size: 11px; color: var(--text-2); font-weight: 700; margin-bottom: 3px; }
+    .ed-title { font-size: 14px; color: var(--text); font-weight: 600; line-height: 1.35; word-break: break-word; }
+    .ed-title.empty { color: var(--text-3); font-weight: 500; font-style: italic; }
+    .ed-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+    .ed-state { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 3px 8px; border-radius: 9999px; white-space: nowrap; }
+    .ed-empty { text-align: center; padding: 40px 20px; color: var(--text-3); font-size: 14px; }
   </style>
 </head>
 <body>
@@ -955,6 +985,9 @@
     </button>
     <button class="nav-item" data-view="calendar" onclick="navTo('calendar')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario
+    </button>
+    <button class="nav-item hidden" data-view="editoriale" onclick="navTo('editoriale')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Editoriale
     </button>
     <button class="nav-item" data-view="overview" onclick="navTo('overview')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Overview
@@ -1043,6 +1076,26 @@
         </div>
       </div>
       <div id="cal-detail"></div>
+    </div>
+
+    <div id="view-editoriale" class="hidden">
+      <div class="emp-hd"><div><h2 class="emp-title">Calendario editoriale</h2><p class="emp-sub">Piano pubblicazioni dei clienti social</p></div></div>
+      <div class="grp-toggle" id="ed-viewtoggle">
+        <button class="grp-btn active" data-ev="agenda" onclick="setEdView('agenda')">Agenda</button>
+        <button class="grp-btn" data-ev="cliente" onclick="setEdView('cliente')">Cliente</button>
+        <button class="grp-btn" data-ev="stato" onclick="setEdView('stato')">Stato</button>
+      </div>
+      <div class="ed-filters">
+        <select id="ed-cliente" onchange="renderEditoriale()"><option value="">Tutti i clienti</option></select>
+        <select id="ed-range" onchange="loadEditoriale()">
+          <option value="7">Prossimi 7 giorni</option>
+          <option value="14" selected>Prossimi 14 giorni</option>
+          <option value="30">Prossimi 30 giorni</option>
+          <option value="90">Prossimi 3 mesi</option>
+        </select>
+      </div>
+      <div id="ed-stats" class="stat-cards"></div>
+      <div id="ed-list"></div>
     </div>
 
     <div id="view-overview" class="hidden">
@@ -1555,6 +1608,10 @@
       var now = new Date(); document.getElementById('f-assign-date').value = now.toISOString().split('T')[0];
       var dl = new Date(now); dl.setDate(dl.getDate()+5); document.getElementById('f-deadline').value = dl.toISOString().split('T')[0];
       document.getElementById('task-form').addEventListener('submit', handleSubmit);
+      // Il calendario editoriale è roba da manager: i piani dei clienti social
+      // non riguardano i dipendenti. La voce nasce nascosta e si mostra qui,
+      // così un ruolo nuovo non se la ritrova visibile per distrazione.
+      document.querySelector('#nav-menu .nav-item[data-view="editoriale"]').classList.remove('hidden');
       await loadTeamDropdown();
       switchView('home');
     } else if (userRole === 'employee') {
@@ -1961,7 +2018,7 @@
     }
     _currentView = v;
     document.body.classList.toggle('is-home', v === 'home');
-    ['home','manager','employee','calendar','overview','search'].forEach(function(name) {
+    ['home','manager','employee','calendar','editoriale','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
     });
@@ -1972,6 +2029,7 @@
     if (v === 'home') renderHome();
     if (v === 'employee') loadMyTasks();
     if (v === 'calendar') loadCalendar();
+    if (v === 'editoriale') loadEditoriale();
     if (v === 'overview') loadOverview();
     if (v === 'search') loadSearch();
   }
@@ -2608,6 +2666,165 @@
     var h = document.createElement('div'); h.className = 'ov-group-hd';
     h.innerHTML = esc(label) + ' <span class="ov-group-count">'+count+'</span>';
     return h;
+  }
+
+  // ── CALENDARIO EDITORIALE (solo manager) ─────────────────────────────────
+  //
+  // Il backend restituisce le righe grezze del tab DB: qui non si replicano i
+  // fogli Calendario/Matrice/Settimana, che sono quattro rendering della stessa
+  // tabella fatti a formule. Le viste se le disegna il frontend, dove costa una
+  // riga di codice invece di mille celle.
+  var _edPosts = [], _edView = 'agenda', _edLoading = false;
+
+  // Stessi colori e icone dell'Apps Script che genera il foglio: se cambiano
+  // là dentro (CFG.stati / CFG.formati), vanno cambiati anche qui.
+  var ED_STATI = {
+    'Idea':         '#94a3b8',
+    'Da produrre':  '#f59e0b',
+    'In revisione': '#a855f7',
+    'Approvato':    '#10b981',
+    'Programmato':  '#3b82f6',
+    'Pubblicato':   '#475569'
+  };
+  var ED_FORMATI = { 'Post':'🖼', 'Carosello':'🎠', 'Reel':'🎬', 'Storia':'⚡', 'Video':'📹', 'Articolo':'📝' };
+
+  function edColor(stato) { return ED_STATI[stato] || '#64748b'; }
+  function edISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function setEdView(v) {
+    _edView = v;
+    var btns = document.querySelectorAll('#ed-viewtoggle .grp-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('active', btns[i].dataset.ev === v);
+    renderEditoriale();
+  }
+
+  async function loadEditoriale() {
+    if (_edLoading) return;
+    _edLoading = true;
+    var list = document.getElementById('ed-list');
+    list.innerHTML = '<div class="ed-empty">Carico il calendario…</div>';
+    try {
+      var giorni = parseInt(document.getElementById('ed-range').value, 10) || 14;
+      var da = new Date(), al = new Date();
+      al.setDate(al.getDate() + giorni - 1);
+      var res = await gasCall('getCalendario', { from: edISO(da), to: edISO(al) });
+      _edPosts = res.posts || [];
+      edFillClienti();
+      renderEditoriale();
+    } catch (e) {
+      document.getElementById('ed-stats').innerHTML = '';
+      // "Azione non riconosciuta" vuol dire una cosa sola: il frontend è più
+      // nuovo del backend. Dirlo esplicitamente evita di andare a caccia di un
+      // bug che non c'è.
+      var msg = /Azione non riconosciuta/i.test(e.message)
+        ? 'Il backend non conosce ancora questa vista.<br>Va caricata su Apps Script la versione aggiornata di Code.gs e creata una nuova versione del deployment.'
+        : esc(e.message);
+      list.innerHTML = '<div class="ed-empty">Non riesco a leggere il calendario editoriale.<br>' + msg + '</div>';
+    } finally {
+      _edLoading = false;
+    }
+  }
+
+  function edFillClienti() {
+    var sel = document.getElementById('ed-cliente'), prima = sel.value, nomi = [];
+    for (var i = 0; i < _edPosts.length; i++) {
+      var c = _edPosts[i].cliente;
+      if (c && nomi.indexOf(c) === -1) nomi.push(c);
+    }
+    nomi.sort(function(a,b){ return a.localeCompare(b, 'it'); });
+    sel.innerHTML = '<option value="">Tutti i clienti</option>' + nomi.map(function(n){
+      return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+    }).join('');
+    if (prima && nomi.indexOf(prima) !== -1) sel.value = prima;
+  }
+
+  function renderEditoriale() {
+    var c = document.getElementById('ed-cliente').value;
+    var posts = c ? _edPosts.filter(function(p){ return p.cliente === c; }) : _edPosts;
+    edRenderStats(posts);
+    var list = document.getElementById('ed-list');
+    if (!posts.length) {
+      list.innerHTML = '<div class="ed-empty">Nessun contenuto in programma in questo periodo.</div>';
+      return;
+    }
+    list.innerHTML = edGroup(posts, _edView === 'agenda' ? 'data' : _edView);
+  }
+
+  function edGroup(posts, key) {
+    var ordine = [], gruppi = {};
+    // Dentro ogni gruppo l'ordine è sempre cronologico: anche raggruppando per
+    // cliente, quello che serve sapere è cosa esce prima.
+    var ordinati = posts.slice().sort(function(a,b){
+      return (a.data + a.ora).localeCompare(b.data + b.ora);
+    });
+    if (key === 'stato') {
+      // Ordine di lavorazione, non alfabetico: da "Idea" a "Pubblicato" si
+      // legge come un flusso di produzione.
+      ordine = Object.keys(ED_STATI);
+      ordine.forEach(function(s){ gruppi[s] = []; });
+    }
+    ordinati.forEach(function(p){
+      var k = p[key] || '—';
+      if (!gruppi[k]) { gruppi[k] = []; ordine.push(k); }
+      gruppi[k].push(p);
+    });
+    if (key === 'cliente') ordine.sort(function(a,b){ return a.localeCompare(b, 'it'); });
+
+    var oggi = edISO(new Date());
+    return ordine.filter(function(k){ return gruppi[k] && gruppi[k].length; }).map(function(k){
+      var n = gruppi[k].length;
+      return '<div class="ed-day">'
+        + '<div class="ed-day-hd' + (key === 'data' && k === oggi ? ' is-today' : '') + '">'
+        +   '<span class="ed-day-name">' + esc(key === 'data' ? edLabelGiorno(k) : k) + '</span>'
+        +   '<span class="ed-day-count">' + n + (n === 1 ? ' contenuto' : ' contenuti') + '</span>'
+        + '</div>'
+        + gruppi[k].map(edCard).join('')
+        + '</div>';
+    }).join('');
+  }
+
+  function edLabelGiorno(iso) {
+    var domani = new Date(); domani.setDate(domani.getDate() + 1);
+    if (iso === edISO(new Date())) return 'Oggi';
+    if (iso === edISO(domani)) return 'Domani';
+    return new Date(iso + 'T00:00:00')
+      .toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  function edCard(p) {
+    var col = edColor(p.stato);
+    var meta = [p.ora, (ED_FORMATI[p.formato] || '•') + ' ' + p.formato, p.canale]
+      .filter(function(x){ return x && x.trim(); }).join('  ·  ');
+    var sub = [];
+    if (_edView !== 'cliente' && p.cliente) sub.push(esc(p.cliente));
+    if (p.pilastro) sub.push(esc(p.pilastro));
+    return '<div class="ed-post">'
+      + '<div class="ed-bar" style="background:' + col + '"></div>'
+      + '<div class="ed-body">'
+      +   '<div class="ed-meta">' + esc(meta) + '</div>'
+      +   (p.titolo
+            ? '<div class="ed-title">' + esc(p.titolo) + '</div>'
+            : '<div class="ed-title empty">Senza titolo — ancora da scrivere</div>')
+      +   (sub.length ? '<div class="ed-sub">' + sub.join('  ·  ') + '</div>' : '')
+      + '</div>'
+      + '<span class="ed-state" style="background:' + col + '22;color:' + col + '">' + esc(p.stato || '—') + '</span>'
+      + '</div>';
+  }
+
+  function edRenderStats(posts) {
+    var oggi = edISO(new Date());
+    function conta(f) { return posts.filter(f).length; }
+    document.getElementById('ed-stats').innerHTML =
+        edStat(conta(function(p){ return p.data === oggi; }), 'Oggi', '')
+      + edStat(conta(function(p){ return p.stato === 'Idea' || p.stato === 'Da produrre'; }), 'Da produrre', 'prog')
+      + edStat(conta(function(p){ return p.stato === 'In revisione'; }), 'In revisione', 'todo')
+      + edStat(conta(function(p){ return !p.titolo; }), 'Senza titolo', 'urgent');
+  }
+  function edStat(n, lbl, cls) {
+    return '<div class="stat-card ' + cls + '"><div class="stat-num">' + n + '</div>'
+         + '<div class="stat-lbl">' + lbl + '</div></div>';
   }
 
   function renderOverview() {
