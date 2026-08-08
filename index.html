@@ -914,6 +914,13 @@
     .ed-post:hover { border-color: rgba(96,165,250,.35); background: var(--card-2); }
     .ed-post:active { transform: scale(.995); }
     .ed-toolbar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+    .ed-form-ft { display: flex; gap: 10px; align-items: center; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+    .ed-brk { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .ed-brk-lbl { font-size: 13px; color: var(--text); flex: 0 0 44%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ed-brk-bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,.06); overflow: hidden; }
+    .ed-brk-fill { height: 100%; border-radius: 4px; }
+    .ed-brk-num { font-size: 12px; font-weight: 700; color: var(--text-2); width: 30px; text-align: right; }
+    .ed-brk-hd { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin: 26px 0 6px; }
     /* Il campo ora non era nella lista dei tipi già stilizzati: senza questo
        resterebbe un input di sistema in mezzo a campi scuri. */
     .edit-fields input[type="time"] {
@@ -1109,7 +1116,7 @@
       </div>
       <div class="ed-filters">
         <select id="ed-cliente" onchange="renderEditoriale()"><option value="">Tutti i clienti</option></select>
-        <select id="ed-range" onchange="loadEditoriale()">
+        <select id="ed-range" onchange="edSetGiorni(this.value)">
           <option value="7">Prossimi 7 giorni</option>
           <option value="14" selected>Prossimi 14 giorni</option>
           <option value="30">Prossimi 30 giorni</option>
@@ -1119,6 +1126,72 @@
       <div id="ed-stats" class="stat-cards"></div>
       <div class="ed-toolbar"><button type="button" class="btn-sm accent" onclick="edApri(null)">+ Nuovo contenuto</button></div>
       <div id="ed-list"></div>
+    </div>
+
+    <div id="view-edhome" class="hidden">
+      <div class="home-hd">
+        <div class="home-greet">HTML Editoriale</div>
+        <div class="home-sub">Piano pubblicazioni dei clienti social</div>
+      </div>
+      <div class="home-grid cols-2" id="edhome-grid"></div>
+    </div>
+
+    <div id="view-edform" class="hidden">
+      <div class="emp-hd"><div>
+        <h2 class="emp-title" id="ed-form-title">Nuovo contenuto</h2>
+        <p class="emp-sub" id="ed-form-sub">Aggiungi un contenuto al calendario</p>
+      </div></div>
+      <div class="card">
+        <div class="edit-fields">
+          <div class="field">
+            <label>Data e ora</label>
+            <div class="date-row">
+              <div><input type="date" id="ed-f-data" required></div>
+              <div><input type="time" id="ed-f-ora"></div>
+            </div>
+          </div>
+          <div class="field"><label for="ed-f-cliente">Cliente</label><select id="ed-f-cliente"></select></div>
+          <div class="field">
+            <label>Canale e formato</label>
+            <div class="date-row">
+              <div><select id="ed-f-canale"></select></div>
+              <div><select id="ed-f-formato"></select></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Pilastro e stato</label>
+            <div class="date-row">
+              <div><select id="ed-f-pilastro"></select></div>
+              <div><select id="ed-f-stato"></select></div>
+            </div>
+          </div>
+          <div class="field"><label for="ed-f-titolo">Titolo / Hook</label><input type="text" id="ed-f-titolo" autocomplete="off"></div>
+          <div class="field"><label for="ed-f-copy">Copy</label><textarea id="ed-f-copy" rows="5"></textarea></div>
+          <div class="field"><label for="ed-f-hashtag">Hashtag</label><input type="text" id="ed-f-hashtag" autocomplete="off"></div>
+          <div class="field"><label for="ed-f-asset">Link asset</label><input type="text" id="ed-f-asset" autocomplete="off"></div>
+          <div class="field"><label for="ed-f-note">Note cliente</label><input type="text" id="ed-f-note" autocomplete="off"></div>
+          <div class="field"><label for="ed-f-link">Link pubblicato</label><input type="text" id="ed-f-link" autocomplete="off"></div>
+        </div>
+        <div class="ed-form-ft">
+          <button type="button" class="btn-sm danger hidden" id="ed-btn-elimina" onclick="edElimina()">Elimina</button>
+          <button type="button" class="btn-sm" onclick="edAnnulla()">Annulla</button>
+          <button type="button" class="btn-sm accent" id="ed-btn-salva" onclick="edSalva()">Salva</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-edoverview" class="hidden">
+      <div class="emp-hd"><div><h2 class="emp-title">Overview editoriale</h2><p class="emp-sub" id="edov-sub">Riepilogo del piano</p></div></div>
+      <div class="ed-filters">
+        <select id="edov-range" onchange="edSetGiorni(this.value)">
+          <option value="7">Prossimi 7 giorni</option>
+          <option value="14">Prossimi 14 giorni</option>
+          <option value="30">Prossimi 30 giorni</option>
+          <option value="90">Prossimi 3 mesi</option>
+        </select>
+      </div>
+      <div id="edov-stats" class="stat-cards"></div>
+      <div id="edov-body"></div>
     </div>
 
     <div id="view-overview" class="hidden">
@@ -1197,52 +1270,6 @@
 </div>
 
 <!-- Task detail modal -->
-<div id="ed-modal" class="modal-overlay hidden">
-  <div class="modal-box edit-modal-box">
-    <div class="modal-hd">
-      <div style="flex:1"><div class="modal-title" id="ed-modal-title">Nuovo contenuto</div></div>
-      <button type="button" class="modal-back" onclick="edCloseModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="edit-fields">
-        <div class="field">
-          <label>Data e ora</label>
-          <div class="date-row">
-            <div><input type="date" id="ed-f-data" required></div>
-            <div><input type="time" id="ed-f-ora"></div>
-          </div>
-        </div>
-        <div class="field"><label for="ed-f-cliente">Cliente</label><select id="ed-f-cliente"></select></div>
-        <div class="field">
-          <label>Canale e formato</label>
-          <div class="date-row">
-            <div><select id="ed-f-canale"></select></div>
-            <div><select id="ed-f-formato"></select></div>
-          </div>
-        </div>
-        <div class="field">
-          <label>Pilastro e stato</label>
-          <div class="date-row">
-            <div><select id="ed-f-pilastro"></select></div>
-            <div><select id="ed-f-stato"></select></div>
-          </div>
-        </div>
-        <div class="field"><label for="ed-f-titolo">Titolo / Hook</label><input type="text" id="ed-f-titolo" autocomplete="off"></div>
-        <div class="field"><label for="ed-f-copy">Copy</label><textarea id="ed-f-copy" rows="4"></textarea></div>
-        <div class="field"><label for="ed-f-hashtag">Hashtag</label><input type="text" id="ed-f-hashtag" autocomplete="off"></div>
-        <div class="field"><label for="ed-f-asset">Link asset</label><input type="text" id="ed-f-asset" autocomplete="off"></div>
-        <div class="field"><label for="ed-f-note">Note cliente</label><input type="text" id="ed-f-note" autocomplete="off"></div>
-        <div class="field"><label for="ed-f-link">Link pubblicato</label><input type="text" id="ed-f-link" autocomplete="off"></div>
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button type="button" class="btn-sm danger hidden" id="ed-btn-elimina" onclick="edElimina()">Elimina</button>
-      <button type="button" class="btn-sm" onclick="edCloseModal()">Annulla</button>
-      <button type="button" class="btn-sm accent" id="ed-btn-salva" onclick="edSalva()">Salva</button>
-    </div>
-  </div>
-</div>
-
 <div id="task-detail-modal" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-hd">
@@ -2089,8 +2116,8 @@
     _currentView = v;
     // hub e home condividono il layout "riempi lo schermo" del mobile: sono
     // entrambe pagine di soli riquadri, senza contenuto che scorre.
-    document.body.classList.toggle('is-home', v === 'home' || v === 'hub');
-    ['hub','home','manager','employee','calendar','editoriale','overview','search'].forEach(function(name) {
+    document.body.classList.toggle('is-home', v === 'home' || v === 'hub' || v === 'edhome');
+    ['hub','home','manager','employee','calendar','edhome','editoriale','edform','edoverview','overview','search'].forEach(function(name) {
       var view = document.getElementById('view-' + name);
       if (view) view.classList.toggle('hidden', v !== name);
     });
@@ -2099,6 +2126,8 @@
       items[i].classList.toggle('active', items[i].dataset.view === v);
     }
     if (v === 'hub') renderHub();
+    if (v === 'edhome') renderEdHome();
+    if (v === 'edoverview') edCaricaEPoi(renderEdOverview);
     if (v === 'home') renderHome();
     if (v === 'employee') loadMyTasks();
     if (v === 'calendar') loadCalendar();
@@ -2131,7 +2160,7 @@
     document.getElementById('hub-name').textContent = (userName || '').split(' ')[0] || '';
     var tiles = [
       { v:'home',       icon:'check', label:'HTML Task',       desc:'Brief e task del team' },
-      { v:'editoriale', icon:'book',  label:'HTML Editoriale', desc:'Calendario dei clienti social' }
+      { v:'edhome',     icon:'book',  label:'HTML Editoriale', desc:'Calendario dei clienti social' }
     ];
     document.getElementById('hub-grid').innerHTML = tiles.map(function(t) {
       return '<button class="home-tile" onclick="navTo(\''+t.v+'\')">'
@@ -2776,6 +2805,9 @@
   // tabella fatti a formule. Le viste se le disegna il frontend, dove costa una
   // riga di codice invece di mille celle.
   var _edPosts = [], _edView = 'agenda', _edLoading = false;
+  // Finestra temporale condivisa: agenda e overview guardano lo stesso periodo,
+  // altrimenti i numeri di una non spiegherebbero quello che si vede nell'altra.
+  var _edGiorni = 14, _edCaricato = false, _edRitorno = 'edhome';
 
   // Stessi colori e icone dell'Apps Script che genera il foglio: se cambiano
   // là dentro (CFG.stati / CFG.formati), vanno cambiati anche qui.
@@ -2807,14 +2839,15 @@
     var list = document.getElementById('ed-list');
     list.innerHTML = '<div class="ed-empty">Carico il calendario…</div>';
     try {
-      var giorni = parseInt(document.getElementById('ed-range').value, 10) || 14;
       var da = new Date(), al = new Date();
-      al.setDate(al.getDate() + giorni - 1);
+      al.setDate(al.getDate() + _edGiorni - 1);
       var res = await gasCall('getCalendario', { from: edISO(da), to: edISO(al) });
       _edPosts = res.posts || [];
       if (res.liste) _edListe = res.liste;
+      _edCaricato = true;
       edFillClienti();
       renderEditoriale();
+      renderEdOverview();
     } catch (e) {
       document.getElementById('ed-stats').innerHTML = '';
       // "Azione non riconosciuta" vuol dire una cosa sola: il frontend è più
@@ -2915,6 +2948,82 @@
       + '</div>';
   }
 
+  // ── Rotte della sezione editoriale ───────────────────────────────────────
+
+  function renderEdHome() {
+    var tiles = [
+      { v:'ednuovo',    icon:'plus',     label:'Nuovo contenuto', desc:'Aggiungi un post al piano' },
+      { v:'editoriale', icon:'calendar', label:'Calendario',      desc:'Agenda dei prossimi giorni' },
+      { v:'edoverview', icon:'chart',    label:'Overview',        desc:'Riepilogo per stato e cliente' }
+    ];
+    document.getElementById('edhome-grid').innerHTML = tiles.map(function(t) {
+      // "ednuovo" non è una vista: apre il form vuoto. Sta fra i riquadri
+      // perché per chi usa l'app è una destinazione come le altre.
+      var azione = t.v === 'ednuovo' ? 'edApri(null)' : 'navTo(\''+t.v+'\')';
+      return '<button class="home-tile" onclick="'+azione+'">'
+        + '<span class="home-tile-icon">'+HOME_ICONS[t.icon]+'</span>'
+        + '<div class="home-tile-text"><div class="home-tile-label">'+esc(t.label)+'</div>'
+        + '<div class="home-tile-desc">'+esc(t.desc)+'</div></div>'
+        + '</button>';
+    }).join('');
+  }
+
+  /** Le viste editoriali hanno bisogno dei dati: se non ci sono, li carica. */
+  function edCaricaEPoi(dopo) {
+    if (_edCaricato) { if (dopo) dopo(); return; }
+    loadEditoriale().then(function(){ if (dopo) dopo(); });
+  }
+
+  function edSetGiorni(v) {
+    _edGiorni = parseInt(v, 10) || 14;
+    ['ed-range','edov-range'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = String(_edGiorni);
+    });
+    loadEditoriale();
+  }
+
+  function renderEdOverview() {
+    var body = document.getElementById('edov-body');
+    if (!body) return;
+    var posts = _edPosts;
+    document.getElementById('edov-sub').textContent =
+      posts.length + (posts.length === 1 ? ' contenuto' : ' contenuti') + ' nei prossimi ' + _edGiorni + ' giorni';
+    edRenderStats(posts, 'edov-stats');
+
+    if (!posts.length) { body.innerHTML = '<div class="ed-empty">Niente in programma in questo periodo.</div>'; return; }
+
+    function conteggi(campo) {
+      var m = {}, ordine = [];
+      posts.forEach(function(p) {
+        var k = p[campo] || '—';
+        if (!(k in m)) { m[k] = 0; ordine.push(k); }
+        m[k]++;
+      });
+      return ordine.map(function(k){ return { k:k, n:m[k] }; }).sort(function(a,b){ return b.n - a.n; });
+    }
+    function barre(voci, colore) {
+      var max = voci.reduce(function(x,v){ return Math.max(x, v.n); }, 1);
+      return voci.map(function(v) {
+        return '<div class="ed-brk">'
+          + '<div class="ed-brk-lbl">' + esc(v.k) + '</div>'
+          + '<div class="ed-brk-bar"><div class="ed-brk-fill" style="width:' + Math.round(v.n / max * 100) + '%;background:' + colore(v.k) + '"></div></div>'
+          + '<div class="ed-brk-num">' + v.n + '</div>'
+          + '</div>';
+      }).join('');
+    }
+    // Gli stati seguono l'ordine di lavorazione, non il conteggio: qui interessa
+    // vedere dove si accumula il lavoro lungo il flusso.
+    var perStato = Object.keys(ED_STATI).map(function(s) {
+      return { k:s, n: posts.filter(function(p){ return p.stato === s; }).length };
+    }).filter(function(v){ return v.n > 0; });
+
+    body.innerHTML =
+        '<div class="ed-brk-hd">Per stato</div>' + barre(perStato, edColor)
+      + '<div class="ed-brk-hd">Per cliente</div>' + barre(conteggi('cliente'), function(){ return '#4c6ef5'; })
+      + '<div class="ed-brk-hd">Per formato</div>' + barre(conteggi('formato'), function(){ return '#38bdf8'; });
+  }
+
   // ── Creazione / modifica / eliminazione ──────────────────────────────────
   var _edListe = { clienti: [], canali: [], formati: [], pilastri: [], stati: [] };
   var _edCorrente = null;   // il post in modifica, null = nuovo
@@ -2932,14 +3041,22 @@
   }
 
   function edApri(riga) {
+    // Il form vuoto si può aprire dalla home della sezione, quando i dati non
+    // sono ancora stati letti: senza questo le tendine sarebbero vuote.
+    if (!_edCaricato) { edCaricaEPoi(function(){ edApri(riga); }); return; }
+
     var p = null;
     if (riga) {
       for (var i = 0; i < _edPosts.length; i++) if (_edPosts[i].riga === riga) { p = _edPosts[i]; break; }
       if (!p) return;
     }
     _edCorrente = p;
+    if (_currentView !== 'edform') _edRitorno = _currentView;
 
-    document.getElementById('ed-modal-title').textContent = p ? 'Modifica contenuto' : 'Nuovo contenuto';
+    document.getElementById('ed-form-title').textContent = p ? 'Modifica contenuto' : 'Nuovo contenuto';
+    document.getElementById('ed-form-sub').textContent   = p
+      ? (p.cliente + ' · ' + edLabelGiorno(p.data))
+      : 'Aggiungi un contenuto al calendario';
     document.getElementById('ed-btn-elimina').classList.toggle('hidden', !p);
 
     document.getElementById('ed-f-data').value    = p ? p.data : edISO(new Date());
@@ -2957,12 +3074,13 @@
     edOpzioni('ed-f-pilastro', _edListe.pilastri, p ? p.pilastro : '');
     edOpzioni('ed-f-stato',    _edListe.stati,    p ? p.stato    : 'Idea');
 
-    document.getElementById('ed-modal').classList.remove('hidden');
+    switchView('edform');
+    window.scrollTo(0, 0);
   }
 
-  function edCloseModal() {
-    document.getElementById('ed-modal').classList.add('hidden');
+  function edAnnulla() {
     _edCorrente = null;
+    switchView(_edRitorno === 'edform' ? 'edhome' : _edRitorno);
   }
 
   function edLeggiForm() {
@@ -2991,9 +3109,10 @@
       } else {
         await gasCall('creaPost', { post: JSON.stringify(post) });
       }
-      edCloseModal();
+      _edCorrente = null;
       showToast('Salvato', 'success');
       await loadEditoriale();
+      switchView(_edRitorno === 'edform' ? 'edhome' : _edRitorno);
     } catch (e) {
       showToast(e.message, 'error');
     } finally {
@@ -3008,9 +3127,10 @@
     btn.disabled = true;
     try {
       await gasCall('eliminaPost', { riga: _edCorrente.riga, chiave: _edCorrente.chiave });
-      edCloseModal();
+      _edCorrente = null;
       showToast('Eliminato', 'success');
       await loadEditoriale();
+      switchView(_edRitorno === 'edform' ? 'edhome' : _edRitorno);
     } catch (e) {
       showToast(e.message, 'error');
     } finally {
@@ -3018,10 +3138,12 @@
     }
   }
 
-  function edRenderStats(posts) {
+  function edRenderStats(posts, target) {
+    var el = document.getElementById(target || 'ed-stats');
+    if (!el) return;
     var oggi = edISO(new Date());
     function conta(f) { return posts.filter(f).length; }
-    document.getElementById('ed-stats').innerHTML =
+    el.innerHTML =
         edStat(conta(function(p){ return p.data === oggi; }), 'Oggi', '')
       + edStat(conta(function(p){ return p.stato === 'Idea' || p.stato === 'Da produrre'; }), 'Da produrre', 'prog')
       + edStat(conta(function(p){ return p.stato === 'In revisione'; }), 'In revisione', 'todo')
