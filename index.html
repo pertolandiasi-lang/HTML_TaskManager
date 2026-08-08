@@ -103,13 +103,11 @@
       transition: transform .2s var(--ease);
     }
     .brand:hover .brand-logo { transform: translateY(-1px); }
-    .bl-html  { font-size: 10px; font-weight: 800; line-height: 1; letter-spacing: .6px; }
-    .bl-check { width: 12px; height: 12px; }
-    .bl-task  { font-size: 9px; font-weight: 600; font-style: italic; line-height: 1; letter-spacing: .3px; }
+    /* Il logo dice solo "HTML": non è più il marchio dei soli task, è quello
+       del contenitore che porta a Task ed Editoriale. */
+    .bl-html  { font-size: 13px; font-weight: 800; line-height: 1; letter-spacing: .8px; }
     .brand-logo.lg { width: 82px; height: 82px; border-radius: 22px; gap: 3px; padding: 10px 0; }
-    .brand-logo.lg .bl-html  { font-size: 17px; letter-spacing: 1px; }
-    .brand-logo.lg .bl-check { width: 20px; height: 20px; }
-    .brand-logo.lg .bl-task  { font-size: 15px; }
+    .brand-logo.lg .bl-html  { font-size: 24px; letter-spacing: 1.4px; }
     .header-right { display: flex; align-items: center; gap: 10px; }
     .menu-btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -948,8 +946,6 @@
 <div id="splash" class="hidden">
   <div class="brand-logo lg">
     <span class="bl-html">HTML</span>
-    <svg class="bl-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-    <span class="bl-task">Task</span>
   </div>
   <div class="splash-spin"></div>
 </div>
@@ -959,8 +955,6 @@
   <div class="signin-card">
     <div class="brand-logo lg" style="margin:0 auto 20px;">
       <span class="bl-html">HTML</span>
-      <svg class="bl-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-      <span class="bl-task">Task</span>
     </div>
     <div class="signin-sub">Gestione task del team con sync su Google Sheets e Drive.</div>
     <button class="btn-google" id="signin-btn" onclick="signIn()">
@@ -975,11 +969,9 @@
 <div id="app" class="hidden">
   <header class="header">
     <div class="header-inner">
-      <div class="brand" onclick="navTo('home')" title="Home">
+      <div class="brand" onclick="goHome()" title="Home">
         <div class="brand-logo">
           <span class="bl-html">HTML</span>
-          <svg class="bl-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
-          <span class="bl-task">Task</span>
         </div>
       </div>
       <div class="header-right">
@@ -2206,6 +2198,13 @@
     }, 200);
   }
   function navTo(v) { switchView(v); closeMenu(); }
+
+  /**
+   * Il logo riporta alla scelta fra le sezioni. Per il dipendente quella
+   * schermata non esiste — vede solo i task — quindi per lui il logo torna
+   * dov'è sempre tornato, altrimenti finirebbe su una pagina vuota.
+   */
+  function goHome() { navTo(userRole === 'manager' ? 'hub' : 'home'); }
 
   var _searchTasks = [];
   async function loadSearch() {
