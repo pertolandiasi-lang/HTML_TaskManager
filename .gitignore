@@ -16,3 +16,6 @@ __pycache__/
 
 # clasp (Apps Script CLI) — contains script ID + auth
 .clasp.json
+
+# wrangler (Cloudflare CLI) — stato locale e cache dei deploy
+.wrangler/

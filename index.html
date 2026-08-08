@@ -1194,10 +1194,23 @@
   async function checkForUpdate() {
     if (_updateShown) return;
     try {
-      var url = location.pathname + '?_v=' + Date.now();
-      var resp = await fetch(url, { cache: 'no-store', method: 'HEAD' });
-      if (!resp.ok) return;
-      var sig = resp.headers.get('ETag') || resp.headers.get('Last-Modified') || resp.headers.get('content-length');
+      // version.txt lo scrive deploy.sh a ogni pubblicazione. Serve perché
+      // Cloudflare Pages sulla root NON manda ETag (lo manda sugli altri file),
+      // quindi il vecchio controllo sugli header lì non vedrebbe mai un
+      // aggiornamento e il banner non comparirebbe più, senza dare errore.
+      var sig = null;
+      try {
+        var v = await fetch('./version.txt?_v=' + Date.now(), { cache: 'no-store' });
+        if (v.ok) sig = (await v.text()).trim();
+      } catch(e) {}
+      // Host senza version.txt (GitHub Pages finché resta acceso): si torna
+      // al confronto sugli header, che lì funziona.
+      if (!sig) {
+        var url = location.pathname + '?_v=' + Date.now();
+        var resp = await fetch(url, { cache: 'no-store', method: 'HEAD' });
+        if (!resp.ok) return;
+        sig = resp.headers.get('ETag') || resp.headers.get('Last-Modified') || resp.headers.get('content-length');
+      }
       if (!sig) return;
       if (_versionSig === null) { _versionSig = sig; return; }
       if (sig !== _versionSig) {

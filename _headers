@@ -1,0 +1,27 @@
+# Cloudflare Pages — header per i file statici.
+
+# ATTENZIONE, non rimettere "no-store" qui.
+# Il rilevatore di aggiornamenti in index.html confronta l'ETag di una HEAD
+# sulla pagina per accorgersi di un deploy nuovo. Con no-store Cloudflare non
+# tiene nessuna copia al bordo, quindi non emette ETag, e il controllo esce
+# subito senza mai mostrare il banner "nuova versione": si rompe in silenzio.
+# no-cache invece conserva la copia ma la rivalida a ogni richiesta: l'utente
+# non vede mai HTML vecchio E l'ETag continua ad arrivare.
+/
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Il service worker. La registrazione usa già updateViaCache:'none', quindi il
+# browser lo riscarica comunque: questo è solo la stessa regola lato CDN.
+/sw.js
+  Cache-Control: no-cache
+
+# La firma della build, riscritta da deploy.sh. Se finisse in cache il banner
+# "nuova versione" arriverebbe in ritardo o mai.
+/version.txt
+  Cache-Control: no-cache
+
+# NOTA: qui NON va messo Cross-Origin-Opener-Policy. Il login Google apre una
+# popup e le parla via postMessage: con COOP: same-origin la popup si chiude e
+# il login resta appeso senza dare nessun errore.
