@@ -95,7 +95,21 @@ function dispatch_(p) {
     // c'entrano niente coi task dei dipendenti.
     case 'getCalendario':
       requireRole_(callerEmail, 'manager');
-      return respond_({ posts: getCalendarioPosts_(p.from, p.to) });
+      return respond_({ posts: getCalendarioPosts_(p.from, p.to), liste: getCalendarioListe_() });
+
+    case 'creaPost':
+      requireRole_(callerEmail, 'manager');
+      return respond_({ riga: creaPost_(JSON.parse(p.post)) });
+
+    case 'aggiornaPost':
+      requireRole_(callerEmail, 'manager');
+      aggiornaPost_(parseInt(p.riga, 10), p.chiave, JSON.parse(p.post));
+      return respond_({ ok: true });
+
+    case 'eliminaPost':
+      requireRole_(callerEmail, 'manager');
+      eliminaPost_(parseInt(p.riga, 10), p.chiave);
+      return respond_({ ok: true });
 
     default:
       throw new Error('Azione non riconosciuta');
@@ -332,30 +346,7 @@ function updateDocBody_(docUrl, company, assignee, assignDate, deadline, brief, 
  * una settimana.
  */
 function getCalendarioPosts_(from, to) {
-  // I due modi in cui questo può fallire hanno entrambi messaggi inutili di
-  // default, e in un'app che gira nel browser un errore incomprensibile costa
-  // mezz'ora di caccia al bug sbagliato. Quindi si spiegano da soli.
-  var ss;
-  try {
-    ss = SpreadsheetApp.openById(CAL_SHEET_ID);
-  } catch (e) {
-    throw new Error(
-      'Non riesco ad aprire il file del calendario editoriale. Il web app gira ' +
-      'come l\'account che l\'ha distribuito: se il foglio appartiene a un altro ' +
-      'account, va condiviso con quello. ID cercato: ' + CAL_SHEET_ID
-    );
-  }
-
-  var sh = ss.getSheetByName('DB');
-  if (!sh) {
-    var nomi = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
-    throw new Error(
-      'Nel calendario editoriale non c\'è nessun tab chiamato "DB". ' +
-      'Le linguette che ho trovato sono: ' + nomi + '. ' +
-      'Se il foglio è nuovo, va prima generato con lo script del calendario.'
-    );
-  }
-
+  var sh   = calDB_();
   var last = sh.getLastRow();
   if (last < 2) return [];
 
@@ -385,13 +376,130 @@ function getCalendarioPosts_(from, to) {
       pilastro: String(r[5]  || ''),
       titolo:   String(r[6]  || ''),
       copy:     String(r[7]  || ''),
+      hashtag:  String(r[8]  || ''),
       asset:    String(r[9]  || ''),
       stato:    String(r[10] || ''),
       note:     String(r[11] || ''),
-      link:     String(r[12] || '')
+      link:     String(r[12] || ''),
+      // Impronta della riga com'era quando l'abbiamo letta. Torna indietro a
+      // ogni modifica: se nel frattempo qualcuno ha inserito o riordinato righe
+      // nel foglio, il numero di riga punta a un altro post e senza questo
+      // controllo ci scriveremmo sopra. Vedi verificaRiga_.
+      chiave:   chiaveRiga_(r, tz)
     });
   }
   return out;
+}
+
+/** L'impronta di una riga del DB: cliente + data + ora. */
+function chiaveRiga_(r, tz) {
+  return String(r[2] || '') + '|'
+       + ((r[0] instanceof Date) ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : '') + '|'
+       + ((r[1] instanceof Date) ? Utilities.formatDate(r[1], tz, 'HH:mm') : '');
+}
+
+/** Il tab DB del calendario, con gli errori parlanti già applicati. */
+function calDB_() {
+  var ss;
+  try {
+    ss = SpreadsheetApp.openById(CAL_SHEET_ID);
+  } catch (e) {
+    throw new Error(
+      'Non riesco ad aprire il file del calendario editoriale. Il web app gira ' +
+      'come l\'account che l\'ha distribuito: se il foglio appartiene a un altro ' +
+      'account, va condiviso con quello. ID cercato: ' + CAL_SHEET_ID
+    );
+  }
+  var sh = ss.getSheetByName('DB');
+  if (!sh) {
+    var nomi = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
+    throw new Error('Nel calendario editoriale non c\'è nessun tab chiamato "DB". Trovate: ' + nomi);
+  }
+  return sh;
+}
+
+/**
+ * Le tendine, lette dal tab Liste del calendario. Vengono da lì e non da una
+ * copia qui dentro: se aggiungi un cliente nel foglio deve comparire nell'app
+ * senza che nessuno rideployi niente.
+ */
+function getCalendarioListe_() {
+  var ss = SpreadsheetApp.openById(CAL_SHEET_ID);
+  var L  = ss.getSheetByName('Liste');
+  if (!L) return { clienti: [], canali: [], formati: [], pilastri: [], stati: [] };
+
+  function colonna(lettera) {
+    return L.getRange(lettera + '2:' + lettera + '60').getValues()
+      .map(function (r) { return String(r[0] || '').trim(); })
+      .filter(function (v) { return v !== ''; });
+  }
+  return {
+    clienti:  colonna('A'),
+    canali:   colonna('C'),
+    formati:  colonna('E'),
+    stati:    colonna('H'),
+    pilastri: colonna('K')
+  };
+}
+
+/**
+ * Le 15 colonne A..O nell'ordine del DB. Le P..T sono formule: non si toccano.
+ *
+ * `esistente` è la riga com'è adesso nel foglio, e serve per le colonne che
+ * l'app non mostra: Views e Interazioni si compilano a mano nel foglio dopo la
+ * pubblicazione, e riscriverle vuote a ogni salvataggio cancellerebbe dati che
+ * l'utente non si aspetta nemmeno di stare toccando.
+ */
+function rigaDaPost_(p, esistente) {
+  var vecchia = esistente || [];
+  var data = p.data ? new Date(p.data + 'T00:00:00') : '';
+  var ora  = '';
+  if (p.ora) {
+    var hm = p.ora.split(':');
+    ora = new Date(1899, 11, 30, parseInt(hm[0], 10) || 0, parseInt(hm[1], 10) || 0);
+  }
+  return [
+    data, ora, p.cliente || '', p.canale || '', p.formato || '', p.pilastro || '',
+    p.titolo || '', p.copy || '', p.hashtag || '', p.asset || '',
+    p.stato || 'Idea', p.note || '', p.link || '',
+    vecchia.length > 13 ? vecchia[13] : '',   // Views
+    vecchia.length > 14 ? vecchia[14] : ''    // Interazioni
+  ];
+}
+
+function creaPost_(p) {
+  if (!p.data)    throw new Error('Manca la data');
+  if (!p.cliente) throw new Error('Manca il cliente');
+  var sh = calDB_();
+  var riga = sh.getLastRow() + 1;
+  sh.getRange(riga, 1, 1, 15).setValues([rigaDaPost_(p)]);
+  return riga;
+}
+
+/**
+ * Controlla che la riga sia ancora quella che il browser credeva di modificare.
+ * Senza, basta che qualcuno inserisca una riga nel foglio mentre hai la vista
+ * aperta e la modifica finisce sul post sbagliato — in silenzio.
+ */
+function verificaRiga_(sh, riga, chiave) {
+  if (!riga || riga < 2) throw new Error('Riga non valida');
+  var r = sh.getRange(riga, 1, 1, 15).getValues()[0];
+  if (chiaveRiga_(r, Session.getScriptTimeZone()) !== chiave) {
+    throw new Error('Il foglio è cambiato da quando hai aperto la vista: ricarica e riprova.');
+  }
+  return r;
+}
+
+function aggiornaPost_(riga, chiave, p) {
+  var sh = calDB_();
+  var vecchia = verificaRiga_(sh, riga, chiave);
+  sh.getRange(riga, 1, 1, 15).setValues([rigaDaPost_(p, vecchia)]);
+}
+
+function eliminaPost_(riga, chiave) {
+  var sh = calDB_();
+  verificaRiga_(sh, riga, chiave);
+  sh.deleteRow(riga);
 }
 
 // ── SHEET VALIDATION SETUP (run once) ────────────────────────────────────────

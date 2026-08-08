@@ -912,6 +912,20 @@
     .ed-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
     .ed-state { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 3px 8px; border-radius: 9999px; white-space: nowrap; }
     .ed-empty { text-align: center; padding: 40px 20px; color: var(--text-3); font-size: 14px; }
+    .ed-post { cursor: pointer; transition: border-color .15s, background .15s; }
+    .ed-post:hover { border-color: rgba(96,165,250,.35); background: var(--card-2); }
+    .ed-post:active { transform: scale(.995); }
+    .ed-toolbar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+    /* Il campo ora non era nella lista dei tipi già stilizzati: senza questo
+       resterebbe un input di sistema in mezzo a campi scuri. */
+    .edit-fields input[type="time"] {
+      background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); font-family: inherit; font-size: 14px; padding: 10px 12px;
+      outline: none; width: 100%;
+    }
+    .edit-fields input[type="date"] { width: 100%; }
+    .btn-sm.danger { border-color: rgba(255,107,107,.4); color: var(--status-todo); margin-right: auto; }
+    .btn-sm.danger:hover { background: rgba(255,107,107,.12); }
   </style>
 </head>
 <body>
@@ -1100,6 +1114,7 @@
         </select>
       </div>
       <div id="ed-stats" class="stat-cards"></div>
+      <div class="ed-toolbar"><button type="button" class="btn-sm accent" onclick="edApri(null)">+ Nuovo contenuto</button></div>
       <div id="ed-list"></div>
     </div>
 
@@ -1179,6 +1194,52 @@
 </div>
 
 <!-- Task detail modal -->
+<div id="ed-modal" class="modal-overlay hidden">
+  <div class="modal-box edit-modal-box">
+    <div class="modal-hd">
+      <div style="flex:1"><div class="modal-title" id="ed-modal-title">Nuovo contenuto</div></div>
+      <button type="button" class="modal-back" onclick="edCloseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="edit-fields">
+        <div class="field">
+          <label>Data e ora</label>
+          <div class="date-row">
+            <div><input type="date" id="ed-f-data" required></div>
+            <div><input type="time" id="ed-f-ora"></div>
+          </div>
+        </div>
+        <div class="field"><label for="ed-f-cliente">Cliente</label><select id="ed-f-cliente"></select></div>
+        <div class="field">
+          <label>Canale e formato</label>
+          <div class="date-row">
+            <div><select id="ed-f-canale"></select></div>
+            <div><select id="ed-f-formato"></select></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Pilastro e stato</label>
+          <div class="date-row">
+            <div><select id="ed-f-pilastro"></select></div>
+            <div><select id="ed-f-stato"></select></div>
+          </div>
+        </div>
+        <div class="field"><label for="ed-f-titolo">Titolo / Hook</label><input type="text" id="ed-f-titolo" autocomplete="off"></div>
+        <div class="field"><label for="ed-f-copy">Copy</label><textarea id="ed-f-copy" rows="4"></textarea></div>
+        <div class="field"><label for="ed-f-hashtag">Hashtag</label><input type="text" id="ed-f-hashtag" autocomplete="off"></div>
+        <div class="field"><label for="ed-f-asset">Link asset</label><input type="text" id="ed-f-asset" autocomplete="off"></div>
+        <div class="field"><label for="ed-f-note">Note cliente</label><input type="text" id="ed-f-note" autocomplete="off"></div>
+        <div class="field"><label for="ed-f-link">Link pubblicato</label><input type="text" id="ed-f-link" autocomplete="off"></div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button type="button" class="btn-sm danger hidden" id="ed-btn-elimina" onclick="edElimina()">Elimina</button>
+      <button type="button" class="btn-sm" onclick="edCloseModal()">Annulla</button>
+      <button type="button" class="btn-sm accent" id="ed-btn-salva" onclick="edSalva()">Salva</button>
+    </div>
+  </div>
+</div>
+
 <div id="task-detail-modal" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-hd">
@@ -2721,6 +2782,7 @@
       al.setDate(al.getDate() + giorni - 1);
       var res = await gasCall('getCalendario', { from: edISO(da), to: edISO(al) });
       _edPosts = res.posts || [];
+      if (res.liste) _edListe = res.liste;
       edFillClienti();
       renderEditoriale();
     } catch (e) {
@@ -2810,7 +2872,7 @@
     var sub = [];
     if (_edView !== 'cliente' && p.cliente) sub.push(esc(p.cliente));
     if (p.pilastro) sub.push(esc(p.pilastro));
-    return '<div class="ed-post">'
+    return '<div class="ed-post" onclick="edApri(' + p.riga + ')">'
       + '<div class="ed-bar" style="background:' + col + '"></div>'
       + '<div class="ed-body">'
       +   '<div class="ed-meta">' + esc(meta) + '</div>'
@@ -2821,6 +2883,109 @@
       + '</div>'
       + '<span class="ed-state" style="background:' + col + '22;color:' + col + '">' + esc(p.stato || '—') + '</span>'
       + '</div>';
+  }
+
+  // ── Creazione / modifica / eliminazione ──────────────────────────────────
+  var _edListe = { clienti: [], canali: [], formati: [], pilastri: [], stati: [] };
+  var _edCorrente = null;   // il post in modifica, null = nuovo
+
+  function edOpzioni(sel, valori, scelto) {
+    var el = document.getElementById(sel);
+    el.innerHTML = valori.map(function(v) {
+      return '<option value="' + esc(v) + '"' + (v === scelto ? ' selected' : '') + '>' + esc(v) + '</option>';
+    }).join('');
+    if (scelto && valori.indexOf(scelto) === -1) {
+      // Un valore che nel foglio c'è ma nelle liste no: va mostrato lo stesso,
+      // altrimenti salvando glielo cambieremmo sotto il naso.
+      el.insertAdjacentHTML('afterbegin', '<option value="' + esc(scelto) + '" selected>' + esc(scelto) + '</option>');
+    }
+  }
+
+  function edApri(riga) {
+    var p = null;
+    if (riga) {
+      for (var i = 0; i < _edPosts.length; i++) if (_edPosts[i].riga === riga) { p = _edPosts[i]; break; }
+      if (!p) return;
+    }
+    _edCorrente = p;
+
+    document.getElementById('ed-modal-title').textContent = p ? 'Modifica contenuto' : 'Nuovo contenuto';
+    document.getElementById('ed-btn-elimina').classList.toggle('hidden', !p);
+
+    document.getElementById('ed-f-data').value    = p ? p.data : edISO(new Date());
+    document.getElementById('ed-f-ora').value     = p ? p.ora : '';
+    document.getElementById('ed-f-titolo').value  = p ? p.titolo : '';
+    document.getElementById('ed-f-copy').value    = p ? p.copy : '';
+    document.getElementById('ed-f-hashtag').value = p ? (p.hashtag || '') : '';
+    document.getElementById('ed-f-asset').value   = p ? p.asset : '';
+    document.getElementById('ed-f-note').value    = p ? p.note : '';
+    document.getElementById('ed-f-link').value    = p ? p.link : '';
+
+    edOpzioni('ed-f-cliente',  _edListe.clienti,  p ? p.cliente  : document.getElementById('ed-cliente').value);
+    edOpzioni('ed-f-canale',   _edListe.canali,   p ? p.canale   : '');
+    edOpzioni('ed-f-formato',  _edListe.formati,  p ? p.formato  : '');
+    edOpzioni('ed-f-pilastro', _edListe.pilastri, p ? p.pilastro : '');
+    edOpzioni('ed-f-stato',    _edListe.stati,    p ? p.stato    : 'Idea');
+
+    document.getElementById('ed-modal').classList.remove('hidden');
+  }
+
+  function edCloseModal() {
+    document.getElementById('ed-modal').classList.add('hidden');
+    _edCorrente = null;
+  }
+
+  function edLeggiForm() {
+    function val(id) { return document.getElementById(id).value.trim(); }
+    return {
+      data:     val('ed-f-data'),   ora:      val('ed-f-ora'),
+      cliente:  val('ed-f-cliente'), canale:  val('ed-f-canale'),
+      formato:  val('ed-f-formato'), pilastro: val('ed-f-pilastro'),
+      stato:    val('ed-f-stato'),   titolo:  val('ed-f-titolo'),
+      copy:     val('ed-f-copy'),    hashtag: val('ed-f-hashtag'),
+      asset:    val('ed-f-asset'),   note:    val('ed-f-note'),
+      link:     val('ed-f-link')
+    };
+  }
+
+  async function edSalva() {
+    var post = edLeggiForm();
+    if (!post.data)    { showToast('Manca la data', 'error'); return; }
+    if (!post.cliente) { showToast('Manca il cliente', 'error'); return; }
+
+    var btn = document.getElementById('ed-btn-salva');
+    btn.disabled = true; btn.textContent = 'Salvo…';
+    try {
+      if (_edCorrente) {
+        await gasCall('aggiornaPost', { riga: _edCorrente.riga, chiave: _edCorrente.chiave, post: JSON.stringify(post) });
+      } else {
+        await gasCall('creaPost', { post: JSON.stringify(post) });
+      }
+      edCloseModal();
+      showToast('Salvato', 'success');
+      await loadEditoriale();
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salva';
+    }
+  }
+
+  async function edElimina() {
+    if (!_edCorrente) return;
+    if (!confirm('Eliminare questo contenuto dal calendario?')) return;
+    var btn = document.getElementById('ed-btn-elimina');
+    btn.disabled = true;
+    try {
+      await gasCall('eliminaPost', { riga: _edCorrente.riga, chiave: _edCorrente.chiave });
+      edCloseModal();
+      showToast('Eliminato', 'success');
+      await loadEditoriale();
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function edRenderStats(posts) {
