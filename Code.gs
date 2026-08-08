@@ -8,6 +8,12 @@ const BACKUP_RETENTION_DAYS = 30;
 // e quell'account possiede entrambi i file.
 const CAL_SHEET_ID = '1CZ3arWFFWZ6qEjqvYZ7Ux9GBsV9rR8R64o5NJciGPtA';
 
+// Etichetta della build. Serve a rispondere alla domanda "il codice che ho
+// salvato è davvero quello che sta girando?", che senza un modo di chiederlo
+// dall'esterno si può solo dedurre dagli errori. Va alzata quando si cambia
+// qualcosa che deve arrivare in produzione.
+const BUILD = '2026-08-08-editoriale';
+
 // ── ENTRY POINTS ─────────────────────────────────────────────────────────────
 
 function doPost(e) {
@@ -47,6 +53,12 @@ function dispatch_(p) {
     syncTaskRow_(parseInt(p.row, 10));
     return respond_({ ok: true });
   }
+  // Sonda senza autenticazione: dice solo quale build sta servendo il
+  // deployment. Non tocca dati e non rivela niente che non sia già pubblico,
+  // ma permette di verificare da fuori se una nuova versione è andata online
+  // invece di dedurlo dagli errori dell'app.
+  if (p.action === 'ping') return respond_({ ok: true, build: BUILD });
+
   if (!p.token) throw new Error('Token mancante');
   var callerEmail = verifyToken_(p.token);
 
