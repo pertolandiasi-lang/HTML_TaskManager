@@ -424,22 +424,49 @@ function calDB_() {
  * senza che nessuno rideployi niente.
  */
 function getCalendarioListe_() {
-  var ss = SpreadsheetApp.openById(CAL_SHEET_ID);
-  var L  = ss.getSheetByName('Liste');
-  if (!L) return { clienti: [], canali: [], formati: [], pilastri: [], stati: [] };
+  var out = { clienti: [], canali: [], formati: [], stati: [], pilastri: [] };
 
-  function colonna(lettera) {
-    return L.getRange(lettera + '2:' + lettera + '60').getValues()
-      .map(function (r) { return String(r[0] || '').trim(); })
-      .filter(function (v) { return v !== ''; });
+  var L = SpreadsheetApp.openById(CAL_SHEET_ID).getSheetByName('Liste');
+  if (L) {
+    var colonna = function (lettera) {
+      return L.getRange(lettera + '2:' + lettera + '60').getValues()
+        .map(function (r) { return String(r[0] || '').trim(); })
+        .filter(function (v) { return v !== ''; });
+    };
+    out.clienti  = colonna('A');
+    out.canali   = colonna('C');
+    out.formati  = colonna('E');
+    out.stati    = colonna('H');
+    out.pilastri = colonna('K');
   }
-  return {
-    clienti:  colonna('A'),
-    canali:   colonna('C'),
-    formati:  colonna('E'),
-    stati:    colonna('H'),
-    pilastri: colonna('K')
-  };
+
+  // Se il tab Liste manca o è vuoto (succede se il foglio è stato ricreato o
+  // copiato senza far girare lo script che lo genera) le tendine arriverebbero
+  // vuote e non si potrebbe compilare niente. Si ricavano allora dai post che
+  // ci sono già, e per i vocabolari fissi si usa quello dello script.
+  var sh   = calDB_();
+  var last = sh.getLastRow();
+  var rows = last > 1 ? sh.getRange(2, 1, last - 1, 15).getValues() : [];
+  function distinti(idx) {
+    var v = [], visti = {};
+    rows.forEach(function (r) {
+      var s = String(r[idx] || '').trim();
+      if (s && !visti[s]) { visti[s] = 1; v.push(s); }
+    });
+    return v.sort(function (a, b) { return a.localeCompare(b, 'it'); });
+  }
+  if (!out.clienti.length)  out.clienti  = distinti(2);
+  if (!out.canali.length)   out.canali   = distinti(3);
+  if (!out.formati.length)  out.formati  = distinti(4);
+  if (!out.pilastri.length) out.pilastri = distinti(5);
+  if (!out.stati.length)    out.stati    = distinti(10);
+
+  if (!out.stati.length)    out.stati    = ['Idea','Da produrre','In revisione','Approvato','Programmato','Pubblicato'];
+  if (!out.formati.length)  out.formati  = ['Post','Carosello','Reel','Storia','Video','Articolo'];
+  if (!out.canali.length)   out.canali   = ['Instagram','Facebook','TikTok','LinkedIn','YouTube'];
+  if (!out.pilastri.length) out.pilastri = ['Prodotto','Dietro le quinte','Educativo','Social proof','Promo','Community'];
+
+  return out;
 }
 
 /**
