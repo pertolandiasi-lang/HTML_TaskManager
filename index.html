@@ -1166,6 +1166,23 @@
 <script>
   if ('serviceWorker' in navigator) {
     var _reloading = false;
+
+    // Guardia anti-loop. _reloading da solo non basta: è una variabile normale,
+    // muore insieme alla pagina, e dopo il reload riparte da false. Se il
+    // service worker si reinstalla a ogni controllo (Safari lo fa se sullo
+    // script arriva un Cache-Control esplicito) il risultato è una pagina che
+    // si ricarica all'infinito senza mai arrivare al login. sessionStorage
+    // sopravvive ai reload della stessa scheda: una ricarica automatica e basta.
+    function swReload() {
+      if (_reloading) return;
+      try {
+        if (sessionStorage.getItem('sw_reloaded') === '1') return;
+        sessionStorage.setItem('sw_reloaded', '1');
+      } catch(e) {}
+      _reloading = true;
+      location.reload();
+    }
+
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(function(reg) {
       reg.update();
       document.addEventListener('visibilitychange', function() {
@@ -1177,15 +1194,14 @@
       reg.addEventListener('updatefound', function() {
         var sw = reg.installing;
         sw.addEventListener('statechange', function() {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller && !_reloading) {
-            _reloading = true; location.reload();
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+            swReload();
           }
         });
       });
     });
     navigator.serviceWorker.addEventListener('controllerchange', function() {
-      if (_reloading) return;
-      _reloading = true; location.reload();
+      swReload();
     });
   }
 

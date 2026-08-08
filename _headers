@@ -12,10 +12,13 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
-# Il service worker. La registrazione usa già updateViaCache:'none', quindi il
-# browser lo riscarica comunque: questo è solo la stessa regola lato CDN.
-/sw.js
-  Cache-Control: no-cache
+# NIENTE regola di cache su /sw.js, ed è deliberato.
+# La registrazione usa già updateViaCache:'none': il browser rivalida comunque
+# il file, quindi un header in più non aggiungeva niente. In compenso Safari,
+# con un Cache-Control esplicito sullo script del service worker, lo considera
+# cambiato a ogni controllo: si reinstalla, la pagina si ricarica, e siccome i
+# controlli sono ogni 60s la pagina va in refresh perpetuo senza mai arrivare
+# al login. Si lascia il default di Pages (must-revalidate + ETag).
 
 # La firma della build, riscritta da deploy.sh. Se finisse in cache il banner
 # "nuova versione" arriverebbe in ritardo o mai.
